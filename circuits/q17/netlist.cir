@@ -1,0 +1,11 @@
+* 教材第 17 题：共射放大器最大不失真输出
+VCC vcc 0 12
+V1 in 0 SIN(0 30m 1k) AC 1
+C1 in b 10u
+R1 vcc b 565k
+R2 vcc c 3k
+Q1 c b 0 QNPN
+C2 c out 10u
+R3 out 0 3k
+.model QNPN NPN(BF=100)
+.end

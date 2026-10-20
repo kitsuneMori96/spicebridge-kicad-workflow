@@ -1,0 +1,5 @@
+{
+  "op": true,
+  "ac": { "start": 10, "stop": 10000000, "ppd": 20 },
+  "clipping_wall": { "source": "V1", "node": "out", "freq": 1000 }
+}

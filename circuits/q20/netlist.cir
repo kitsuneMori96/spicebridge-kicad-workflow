@@ -1,0 +1,14 @@
+* 教材第 20 题：Re 无旁路电容，求 Au（无 Ce 版本）
+VCC vcc 0 12
+V1 s 0 SIN(0 30m 1k) AC 1
+R1 s in 1k
+C1 in b 10u
+R2 vcc b 510k
+R3 vcc c 3k
+Q1 c b e QNPN
+R4 e 0 1k
+
+C2 c out 10u
+R5 out 0 3k
+.model QNPN NPN(BF=100)
+.end

@@ -11,15 +11,17 @@
 
 ```
 spice-projects/
-├── run.py                 # 一键：仿真 → 出图 → 校验 → 渲染
+├── run.py                 # 一键：仿真 → 瞬态 → 出图 → 校验 → 渲染，结尾 RESULT 行
 ├── flow.py                # 多步 MCP 调用（同一 stdio 会话，circuit_id 才有效）
+├── tran.py                # 直连 ngspice 批处理：稳态瞬态、THD、削顶墙、最大不失真
 ├── mcp_call.py            # 单次 MCP 调用 / 列工具 / 查 schema
-├── kicad_build.py         # 自带 KiCad 8 原理图生成器（器件库 + 布线 + 输出）
+├── kicad_build.py         # 自带 KiCad 8 原理图生成器（器件库 + 布线 + 引脚坐标 dump）
 ├── verify_kicad.py        # 权威校验：kicad-cli 网表连通分割比对 + ERC 引脚检查
+├── patches/               # SPICEBridge 1.3.0 修复补丁 + install.sh（重装后一键复现）
 ├── circuits/<name>/       # 一个电路一个目录
 │   ├── netlist.cir        #   SPICE 网表（不含分析语句）
-│   ├── layout.py          #   原理图版式脚本（输入输出路径见下）
-│   └── spec.json          #   要跑哪些分析
+│   ├── layout.py          #   原理图版式脚本（`--pins` 可 dump 引脚坐标）
+│   └── spec.json          #   要跑哪些分析（op/ac/tran/clipping_wall/max_undistorted）
 ├── out/<name>/            # 产物：.kicad_sch / .svg / .png（已 gitignore）
 ├── docs/                  # 示例渲染图
 └── smoke/                 # 回归用例（rc 低通、bjt 共射）
@@ -30,24 +32,41 @@ spice-projects/
 ```bash
 git clone https://github.com/kitsuneMori96/spicebridge-kicad-workflow.git
 cd spicebridge-kicad-workflow
+./patches/install.sh          # 给装好的 spicebridge 打上必需补丁（幂等）
 python3 run.py circuits/ce_amp
 ```
 
 依赖（Ubuntu/WSL）：
 
 ```bash
-pip3 install --user spicebridge mcp cairosvg      # SPICEBridge 自带 ngspice 调用
+pip3 install --user spicebridge mcp cairosvg pillow   # SPICEBridge 自带 ngspice 调用
 sudo apt install ngspice
 sudo add-apt-repository ppa:kicad/kicad-8.0-releases && sudo apt install kicad
 ```
 
+如果要在 agent CLI 里直接调用 SPICEBridge 工具（而非只用本仓库脚本），注册为 MCP 服务：
+
+```bash
+qodercli mcp add spicebridge ~/.local/bin/spicebridge --scope user --transport stdio
+```
+
+（会话内再执行 `/mcp reload` 生效。`run.py`/`flow.py` 不依赖这一步，它们自己起 stdio 会话。）
+
 输出：
 
 ```
-  op : {'v(vcc)': 12.0, 'v(b)': 1.5678, 'v(c)': 6.8334, 'v(e)': 0.7616, ...}
-  ac : gain 15.13 dB at 1e7 Hz, dc gain 14.96 dB
+== q17: simulation ==
+  op : {'v(vcc)': 12.0, 'v(b)': 0.7919, 'v(c)': 6.0488, ...}
+  ac : gain 36.95 dB (dc), peak 41.22 dB
+== q17: transient ==
+  wall: +2.532 / -8.037 V, max undistorted Uo = 2.532 V peak (1.790 V rms)
+== q17: schematic ==
+== q17: KiCad verification ==
 PASS: KiCad loads the file, pins are connected, netlist matches
-OK -> out/ce_amp/ce_amp.kicad_sch
+== q17: render ==
+  out/q17/q17.png (2400x1697)
+
+RESULT: PASS -> out/q17/q17.kicad_sch
 ```
 
 `out/<name>/<name>.kicad_sch` 可直接用 KiCad 8 打开、修改、重新仿真。
@@ -70,7 +89,7 @@ OK -> out/ce_amp/ce_amp.kicad_sch
    import sys
    from pathlib import Path
    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # 仓库根目录
-   from kicad_build import Schematic
+   from kicad_build import Schematic, layout_main
 
    sch = Schematic("我的电路")
    Q1 = sch.add("Q1", "Q", "Q2N2222", ["c", "b", "e"], 127.00, 66.04, 0)
@@ -79,19 +98,36 @@ OK -> out/ce_amp/ce_amp.kicad_sch
    sch.connect(R1.pin("2"), Q1.pin("C"))   # 自动拐一次弯
    sch.power_port("power:VCC", 96.52, 35.56)
    sch.label("c", 133.35, 63.50)
-   open(sys.argv[1], "w").write(sch.emit())
+
+   if __name__ == "__main__":
+       raise SystemExit(layout_main(sch))
    ```
 
    - 坐标单位 mm，全部落在 1.27 mm 栅格上（`snap()` 会强制对齐）
    - `part.pin("1")` 按引脚号取坐标，`part.pin_for("b")` 按网表节点名取坐标
    - 器件位号必须是「字母 + 数字」（`R4`、`R5`），`RE`/`RL` 这种会被 KiCad 判为未标注
+   - 连线老是不连通（NETLIST MISMATCH）时先跑 `python3 layout.py --pins`，
+     拿到每个引脚的绝对坐标再对——`run.py` 校验失败时也会自动 dump 这张表
 
 3. **写分析** `circuits/<name>/spec.json`
    ```json
-   { "op": true, "ac": { "start": 10, "stop": 10000000, "ppd": 20 } }
+   {
+     "op": true,
+     "ac": { "start": 10, "stop": 10000000, "ppd": 20 },
+     "tran": { "source": "V1", "node": "out", "freq": 1000, "amp": 0.03 },
+     "clipping_wall": { "source": "V1", "node": "out", "freq": 1000 },
+     "max_undistorted": { "source": "V1", "node": "out", "freq": 1000, "thd": 1.0 }
+   }
    ```
 
-4. `python3 run.py circuits/<name>`，必须看到 `PASS`。
+   - `tran`：指定输入幅值跑瞬态，自动加倍时长直到稳态，报告输出峰值与 THD
+   - `clipping_wall`：教材口径的「最大不失真输出」——幅值倍增直到输出峰值不再
+     增长（硬削顶渐近线），取正/负墙较小者，`wall_rms_V = wall_peak / √2`
+   - `max_undistorted`：工程口径——按 THD 限值几何加倍 + 二分找输入幅值
+   - 瞬态直连本机 ngspice 批处理（`tran.py`），不走 MCP；也可单独用：
+     `python3 tran.py circuits/q17/netlist.cir out`
+
+4. `python3 run.py circuits/<name>`，结尾必须看到 `RESULT: PASS`。
 
 ## 校验到底校验了什么
 
@@ -113,18 +149,44 @@ OK -> out/ce_amp/ce_amp.kicad_sch
   这样出来的图才像人画的。
 - **KiCad 视图里的 "library not configured" 警告**是正常的：符号已内嵌在文件里，不依赖
   本机库表。
-- `spicebridge` 的 site-packages 打了三个补丁（见下），重装会丢失。
+- `spicebridge` 的 site-packages 补丁已固化在 `patches/`，重装后跑一次
+  `./patches/install.sh` 即可（幂等，`--check` 只查状态）。
 
-## 对 SPICEBridge 的本地补丁
+## 对 SPICEBridge 的本地补丁（patches/）
 
-| 文件 | 问题 | 处理 |
+| 补丁 | 问题 | 处理 |
 |---|---|---|
-| `spicebridge/kicad_export.py` | 导出的 `.kicad_sch` KiCad 8 打不开；引脚/标签偏移 2.54 mm；子电路符号名带库前缀 | 修正符号名、栅格、GND/标签偏移；并绕过其导出器 |
-| `spicebridge/simulator.py` | spicelib 共享库后端把 ngspice banner 写到进程 stdout，冲垮 MCP stdio 协议 | 默认走子进程后端（输出被捕获），`SPICEBRIDGE_USE_SPICELIB=1` 可切回 |
-| `~/.config/opencode/opencode.jsonc` | — | 注册 `spicebridge` 为本地 MCP server |
+| `spicebridge-1.3.0-simulator.patch` | spicelib 共享库后端把 ngspice banner 写到进程 stdout，冲垮 MCP stdio 协议 | 默认走子进程后端（输出被捕获），`SPICEBRIDGE_USE_SPICELIB=1` 可切回 |
+| `spicebridge-1.3.0-kicad_export.patch` | 导出的 `.kicad_sch` KiCad 8 打不开；BJT/二极管的 SPICE 节点序与 KiCad 引脚号不一致导致错连；子电路符号名带库前缀 | 修正符号名、栅格、引脚映射，并为 X 子电路生成带编号的框符号 |
 
-> 原理图实际由本仓库的 `kicad_build.py` 生成（已验证），`kicad_export.py` 的补丁只用于
-> 让原工具在别的场合不至于崩。
+补丁对干净 wheel 逐级可复现（先 `pip3 download spicebridge==1.3.0 --no-deps`
+解包，再对 `whl/` 目录 `patch -N -p1`），所以它们同时是升级时的行为回归基线。
+
+> 原理图主力生成器仍是本仓库的 `kicad_build.py`（每张图都过 KiCad 8 实测校验），
+> `kicad_export.py` 的补丁只用于让原工具在别的场合不至于崩。banner 污染 stdout
+> 的问题已向上游提 PR（clanker-lover/spicebridge）。
+
+## 教材例题索引
+
+模电「共射放大器」系列选择题的完整闭环案例：网表 → MCP 仿真 → 瞬态扫描 →
+KiCad 原理图 → 校验 PASS。
+
+| 题 | 考点 | 电路 | 仿真实测 | 答案 |
+|---|---|---|---|---|
+| 17 | 最大不失真输出电压 Uo | `circuits/q17` | U_CEQ=6.05 V；削顶墙 +2.53/−8.04 V → Uo=1.79 V rms | **A（2 V）**，截止侧先碰墙 |
+| 18 | 分压偏置求 U_CEQ | `circuits/q18` | v(b)=2.64 V, v(e)=1.85 V, v(c)=6.50 V → U_CEQ=4.64 V | **B（4.5 V）** |
+| 19 | 画交流等效电路 | 概念题，对照 q18/q20 两份网表 | Ce 是否存在决定 Re 进不进交流通路 | **B** |
+| 20 | 求电压增益 A_u | `circuits/q20`（= q18 去掉 Ce） | \|Au\|=3.21 dB=1.45 倍（含 Re 负反馈） | **A（−1.5）** |
+
+![q17 输出波形（削顶渐近线）](docs/q17_waveform.png)
+
+两个值得留意的物理细节：
+
+- **THD 判据与教材口径不等价**。BJT 指数特性使软削顶在微伏级输入就存在，THD
+  1% 判据（`max_undistorted`）给出的「最大不失真」远小于教材的硬削顶墙
+  （`clipping_wall`）。做题用后者，做功放线性度指标用前者。
+- **输出耦合电容需要建立时间**。`run_tran` 会自动把时长加倍直到最后两周期峰值
+  差 <2%（τ=R_L'·C₂=30 ms 时约需 120 ms 仿真时长），不然测到的输出接近 0。
 
 ## 环境
 
