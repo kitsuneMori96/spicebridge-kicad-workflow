@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+out/
+smoke/kicad_out/
+smoke/*_built.kicad_sch
+smoke/rc_test.kicad_sch
+smoke/bjt.kicad_sch
+smoke/opamp.kicad_sch
+kicad_export.py.orig
+*.net
+smoke/ce_amp.kicad_sch

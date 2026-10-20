@@ -1,0 +1,13 @@
+* CE amplifier, single stage
+VCC vcc 0 12
+V1 in 0 AC 1
+C1 in b 10u
+R1 vcc c 1.5k
+R2 vcc b 100k
+R3 b 0 18k
+Q1 c b e Q2N2222
+R4 e 0 220
+C2 c out 10u
+R5 out 0 10k
+.model Q2N2222 NPN(BF=200)
+.end

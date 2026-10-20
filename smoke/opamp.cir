@@ -1,0 +1,6 @@
+* inverting amplifier
+V1 in 0 AC 1
+R1 in nsum 10k
+R2 nsum out 100k
+XU1 0 nsum out OPA
+.end
