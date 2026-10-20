@@ -28,8 +28,17 @@ spice-projects/
 ## 快速开始
 
 ```bash
-cd ~/spice-projects
+git clone https://github.com/kitsuneMori96/spicebridge-kicad-workflow.git
+cd spicebridge-kicad-workflow
 python3 run.py circuits/ce_amp
+```
+
+依赖（Ubuntu/WSL）：
+
+```bash
+pip3 install --user spicebridge mcp cairosvg      # SPICEBridge 自带 ngspice 调用
+sudo apt install ngspice
+sudo add-apt-repository ppa:kicad/kicad-8.0-releases && sudo apt install kicad
 ```
 
 输出：
@@ -59,7 +68,8 @@ OK -> out/ce_amp/ce_amp.kicad_sch
 
    ```python
    import sys
-   sys.path.insert(0, "/home/kitsunemori/spice-projects")
+   from pathlib import Path
+   sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # 仓库根目录
    from kicad_build import Schematic
 
    sch = Schematic("我的电路")

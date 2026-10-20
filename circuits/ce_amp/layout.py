@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Hand-laid KiCad schematic: single-stage common-emitter amplifier."""
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/home/kitsunemori/spice-projects")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 from kicad_build import Schematic
 
 sch = Schematic("CE amplifier")
