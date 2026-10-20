@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -267,6 +269,22 @@ class Schematic:
                     out.append((u, v))
         return out
 
+    def pin_report(self) -> str:
+        """Absolute pin coordinates for every part - the table you need
+        when hand-writing a layout and wires keep missing their endpoints."""
+        lines = []
+        for ref, p in self.parts.items():
+            nums = pin_numbers(p.comp_type, len(p.nodes))
+            for n, node in zip(nums, p.nodes):
+                x, y = p.pin_pos(n)
+                lines.append(f"{ref}.{n}  node={node:<8} ({x:.2f}, {y:.2f})")
+        return "\n".join(lines)
+
+    def save(self, path) -> None:
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(self.emit(), encoding="utf-8")
+
     def emit(self) -> str:
         used = {p.lib_id for p in self.parts.values()} | {p[0] for p in self.power}
         root = uid()   # every instance path must point at this sheet
@@ -484,6 +502,27 @@ def build(netlist: str, title: str = "") -> Schematic:
     auto_layout(parts)
     route(sch)
     return sch
+
+
+def layout_main(sch: Schematic) -> int:
+    """Shared entrypoint for hand-written layout scripts.
+
+        python3 layout.py out.kicad_sch   -> write the sheet
+        python3 layout.py --pins          -> dump absolute pin coordinates
+
+    The --pins table is what you need when a hand-routed wire misses a pin:
+    every coordinate in a layout must come from Part.pin()/pin_for(), not
+    from eyeballing the symbol center.
+    """
+    if "--pins" in sys.argv or os.environ.get("LAYOUT_DUMP_PINS"):
+        print(sch.pin_report())
+        return 0
+    if len(sys.argv) < 2:
+        print("usage: layout.py <out.kicad_sch|--pins>", file=sys.stderr)
+        return 2
+    sch.save(sys.argv[1])
+    print(f"wrote {sys.argv[1]}: {len(sch.parts)} parts, {len(sch.wires)} wires")
+    return 0
 
 
 def main() -> int:

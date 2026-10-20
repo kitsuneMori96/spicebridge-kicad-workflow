@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
-from kicad_build import Schematic
+from kicad_build import Schematic, layout_main
 
 sch = Schematic("CE amplifier")
 RAIL_Y = 35.56
@@ -69,6 +69,4 @@ sch.label("c", 133.35, 63.50)
 sch.label("out", 152.40, 63.50)
 
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/opencode/bjt_hand.kicad_sch"
-    open(out, "w").write(sch.emit())
-    print(f"wrote {out}: {len(sch.parts)} parts, {len(sch.wires)} wires")
+    raise SystemExit(layout_main(sch))
