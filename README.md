@@ -209,7 +209,8 @@ spec 里带 `anim` 段时，`run.py` 会额外产出 `out/<name>/<name>_anim.svg
 - 单独生成：`python3 svg_anim.py circuits/q17`，加 `--png` 顺带出静态预览图
 
 **为什么不用 JS**：GitHub README 用 `<img>` 引用 SVG，脚本会被沙箱挡掉；SMIL 不会。
-不支持 SMIL 的渲染器（cairosvg、打印、部分预览器）看到的是淡影 + 静态全波形，不会白图。
+不支持 SMIL 的渲染器（cairosvg、打印、部分预览器）看到的是静态全波形：
+描边动画的初始值就是「已画完」，所以不会白图。
 
 ## 教材例题索引
 
