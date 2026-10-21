@@ -12,7 +12,8 @@ A circuit directory holds:
         "ac": {"start": 10, "stop": 1e7, "ppd": 20},
         "tran": {"source": "V1", "node": "out", "freq": 1000, "amp": 0.03},
         "clipping_wall": {"source": "V1", "node": "out", "freq": 1000},
-        "max_undistorted": {"source": "V1", "node": "out", "freq": 1000, "thd": 1.0}
+        "max_undistorted": {"source": "V1", "node": "out", "freq": 1000, "thd": 1.0},
+        "anim": {"source": "V1", "amp": 0.05, "freq": 1000, "traces": [...]}
     }
 
 Steps:
@@ -21,6 +22,7 @@ Steps:
   3. schematic generation from the hand-written layout
   4. verification with real KiCad (kicad-cli netlist + ERC)
   5. SVG/PNG render, with the PNG checked before we claim success
+  6. optional SVG animation (svg_anim.py) driven by the same netlist
 
 Exit code 0 only if KiCad verification passes.
 """
@@ -181,6 +183,13 @@ def main() -> int:
         print("VERIFICATION FAILED", flush=True)
         print("RESULT: FAIL")
         return 1
+
+    anim = spec.get("anim")
+    if anim:
+        print(f"== {name}: SVG animation ==", flush=True)
+        import svg_anim
+        ap = svg_anim.build(cdir, out / f"{name}_anim.svg")
+        print(f"  anim: {ap} ({ap.stat().st_size / 1024:.0f} KiB)", flush=True)
 
     print(f"== {name}: render ==", flush=True)
     ok = render(sch, out, name)

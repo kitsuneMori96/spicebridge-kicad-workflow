@@ -14,6 +14,7 @@ spice-projects/
 ├── run.py                 # 一键：仿真 → 瞬态 → 出图 → 校验 → 渲染，结尾 RESULT 行
 ├── flow.py                # 多步 MCP 调用（同一 stdio 会话，circuit_id 才有效）
 ├── tran.py                # 直连 ngspice 批处理：稳态瞬态、THD、削顶墙、最大不失真
+├── svg_anim.py            # 仿真结果 → 自包含 SVG 动画（纯 SMIL，无 JS）
 ├── mcp_call.py            # 单次 MCP 调用 / 列工具 / 查 schema
 ├── kicad_build.py         # 自带 KiCad 8 原理图生成器（器件库 + 布线 + 引脚坐标 dump）
 ├── verify_kicad.py        # 权威校验：kicad-cli 网表连通分割比对 + ERC 引脚检查
@@ -21,9 +22,9 @@ spice-projects/
 ├── circuits/<name>/       # 一个电路一个目录
 │   ├── netlist.cir        #   SPICE 网表（不含分析语句）
 │   ├── layout.py          #   原理图版式脚本（`--pins` 可 dump 引脚坐标）
-│   └── spec.json          #   要跑哪些分析（op/ac/tran/clipping_wall/max_undistorted）
-├── out/<name>/            # 产物：.kicad_sch / .svg / .png（已 gitignore）
-├── docs/                  # 示例渲染图
+│   └── spec.json          #   要跑哪些分析（op/ac/tran/clipping_wall/max_undistorted/anim）
+├── out/<name>/            # 产物：.kicad_sch / .svg / .png / _anim.svg（已 gitignore）
+├── docs/                  # 示例渲染图 + 生成脚本
 └── smoke/                 # 回归用例（rc 低通、bjt 共射）
 ```
 
@@ -63,6 +64,8 @@ qodercli mcp add spicebridge ~/.local/bin/spicebridge --scope user --transport s
 == q17: schematic ==
 == q17: KiCad verification ==
 PASS: KiCad loads the file, pins are connected, netlist matches
+== q17: SVG animation ==
+  anim: out/q17/q17_anim.svg (110 KiB)
 == q17: render ==
   out/q17/q17.png (2400x1697)
 
@@ -166,6 +169,48 @@ RESULT: PASS -> out/q17/q17.kicad_sch
 > `kicad_export.py` 的补丁只用于让原工具在别的场合不至于崩。banner 污染 stdout
 > 的问题已向上游提 PR（clanker-lover/spicebridge）。
 
+## 仿真结果动画（SVG）
+
+spec 里带 `anim` 段时，`run.py` 会额外产出 `out/<name>/<name>_anim.svg`：
+自包含、纯 SMIL，没有 JS 和外部依赖，浏览器打开就播，GitHub README 里也直接播。
+
+![q17 仿真波形动画](docs/q17_anim.svg)
+
+画面里的每一根线都来自真实 ngspice 瞬态：
+
+- **黄色主波形**：`u_o(t)`，描边随播放头逐点画出；红虚线是教材口径的两道墙
+  （电流截止 +3 V、饱和 −5.3 V）
+- **青色小条**：`u_i(t)`，用来对照输入幅度
+- **右侧平面**：`Δi_C – Δu_CE` 增量轨迹，实测斜率就是 `−1/(Rc∥RL) = −1/1.5 kΩ`；
+  亮点沿轨迹走，能直接看到工作点被推到截止边
+- **右上角读数**：跟随播放头的瞬时数值，全部来自仿真数组
+
+配置示例（`circuits/q17/spec.json`）：
+
+```json
+"anim": {
+  "source": "V1", "amp": 0.05, "freq": 1000, "window_cycles": 3,
+  "traces": [
+    { "expr": "v(out)", "label": "u_o", "unit": "V",  "scale": 1,    "digits": 2 },
+    { "expr": "v(in)",  "label": "u_i", "unit": "mV", "scale": 1000, "panel": "input" }
+  ],
+  "limits": [ { "value": 3.0, "label": "电流截止墙 +3 V" } ],
+  "plane": {
+    "x_expr": "v(c) - v(e)", "y_expr": "-i(VIC) * 1000",
+    "probe": { "q": "Q1", "source": "VIC" }
+  }
+}
+```
+
+- `traces[].expr` 是 ngspice 向量表达式；`panel: "input"` 的画在下方小条
+- `plane.probe` 会在 Q 的集电极**临时**串一支 0 V 电流表：不改变工作点，也不进原理图。
+  必须这么做，是因为 `@q1[ic]` 只在工作点求值，瞬态里是常数，画不出轨迹
+- 波形走 `tran.waveform()`：自动等到稳态，再取末尾 `window_cycles` 个周期
+- 单独生成：`python3 svg_anim.py circuits/q17`，加 `--png` 顺带出静态预览图
+
+**为什么不用 JS**：GitHub README 用 `<img>` 引用 SVG，脚本会被沙箱挡掉；SMIL 不会。
+不支持 SMIL 的渲染器（cairosvg、打印、部分预览器）看到的是淡影 + 静态全波形，不会白图。
+
 ## 教材例题索引
 
 模电「共射放大器」系列选择题的完整闭环案例：网表 → MCP 仿真 → 瞬态扫描 →
@@ -177,6 +222,8 @@ KiCad 原理图 → 校验 PASS。
 | 18 | 分压偏置求 U_CEQ | `circuits/q18` | v(b)=2.64 V, v(e)=1.85 V, v(c)=6.50 V → U_CEQ=4.64 V | **B（4.5 V）** |
 | 19 | 画交流等效电路 | 概念题，对照 q18/q20 两份网表 | Ce 是否存在决定 Re 进不进交流通路 | **B** |
 | 20 | 求电压增益 A_u | `circuits/q20`（= q18 去掉 Ce） | \|Au\|=3.21 dB=1.45 倍（含 Re 负反馈） | **A（−1.5）** |
+
+静态对比（25 mV 未削顶 vs 50 mV 正半周削顶，`docs/make_q17_waveform.py` 生成）：
 
 ![q17 输出波形（削顶渐近线）](docs/q17_waveform.png)
 

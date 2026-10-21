@@ -1,5 +1,65 @@
 {
   "op": true,
-  "ac": { "start": 10, "stop": 10000000, "ppd": 20 },
-  "clipping_wall": { "source": "V1", "node": "out", "freq": 1000 }
+  "ac": {
+    "start": 10,
+    "stop": 10000000,
+    "ppd": 20
+  },
+  "clipping_wall": {
+    "source": "V1",
+    "node": "out",
+    "freq": 1000
+  },
+  "anim": {
+    "title": "共射放大器 · 最大不失真输出的两道墙",
+    "subtitle": "Vcc=12 V, Rc=RL=3 kΩ, U_CEQ≈6.05 V, I_CQ≈2.0 mA   (q17)",
+    "tag": "ngspice 实测",
+    "footnote": "数据来源：circuits/q17 网表，ngspice 瞬态 + 自动稳态，窗口为末 3 个周期（输入 50 mV 峰值 / 1 kHz）。",
+    "source": "V1",
+    "amp": 0.05,
+    "freq": 1000,
+    "window_cycles": 3,
+    "traces": [
+      {
+        "expr": "v(out)",
+        "label": "u_o",
+        "unit": "V",
+        "scale": 1.0,
+        "digits": 2,
+        "color": "#ffb703"
+      },
+      {
+        "expr": "v(in)",
+        "label": "u_i",
+        "unit": "mV",
+        "scale": 1000.0,
+        "digits": 1,
+        "panel": "input",
+        "color": "#4cc9f0",
+        "note": "输入 50 mV 峰值 / 1 kHz"
+      }
+    ],
+    "limits": [
+      {
+        "value": 3.0,
+        "label": "电流截止墙 +3 V"
+      },
+      {
+        "value": -5.3,
+        "label": "饱和墙 -5.3 V"
+      }
+    ],
+    "plane": {
+      "x_expr": "v(c) - v(e)",
+      "y_expr": "-i(VIC) * 1000",
+      "xlabel": "Δu_CE (V)",
+      "ylabel": "Δi_C (mA)",
+      "center": true,
+      "probe": {
+        "q": "Q1",
+        "source": "VIC"
+      }
+    },
+    "plane_title": "增量轨迹（实测交流负载线）"
+  }
 }

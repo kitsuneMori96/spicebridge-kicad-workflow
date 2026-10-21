@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 NGSPICE = "ngspice"
+_WARNED: set[str] = set()
 
 
 def ensure_title(netlist: str) -> str:
@@ -138,6 +139,96 @@ def _voltage_nodes(netlist: str) -> list[str]:
                 nodes.add(tok)
     nodes.discard("0")
     return sorted(nodes)
+
+
+def add_current_probe(netlist: str, qname: str, source: str = "VIC") -> tuple[str, str]:
+    """在晶体管集电极串一支 0 V 电流表，返回 (新网表, 电流向量表达式)。
+
+    0 V 源不改变任何工作点，但能让 ngspice 直接给出 i_c(t)。
+    （@q1[ic] 只在工作点求值，瞬态里是常数，不能用来画轨迹。）
+    """
+    lines = netlist.splitlines()
+    for i, line in enumerate(lines):
+        toks = line.split()
+        if len(toks) >= 4 and toks[0].lower() == qname.lower():
+            node = toks[1] + "__ic"
+            toks[1] = node
+            lines[i] = " ".join(toks)
+            src = f"{source} {node} {toks[1][:-4]} 0"
+            for j, ln in enumerate(lines):
+                if ln.strip().lower().startswith(".end"):
+                    lines.insert(j, src)
+                    break
+            else:
+                lines.append(src)
+            return "\n".join(lines), f"i({source})"
+    raise ValueError(f"网表里找不到晶体管 {qname}")
+
+
+def waveform(netlist: str, vectors: list[str], freq: float, amp: float | None = None,
+             source: str | None = None, cycles: int = 40, window_cycles: int = 3,
+             points_per_cycle: int = 400, settle_vector: str | None = None,
+             max_retries: int = 8) -> dict:
+    """跑瞬态直到稳态，返回末尾 window_cycles 个周期的等间隔波形（给 SVG 动画用）。
+
+    vectors 是 ngspice 向量表达式，例如 ["v(out)", "i(vcc)"]；
+    返回 {"t": 秒（从 0 起）, "y": {表达式: ndarray}, "settled", "attempts"}。
+    """
+    if amp is not None and source:
+        netlist = set_sin(netlist, source, amp, freq)
+    dt = 1.0 / (freq * 1000)
+    total = cycles / freq
+    settle = settle_vector or vectors[0]
+    data, settled, attempts, last = {}, False, 0, None
+    for attempt in range(max_retries):
+        data = _wrdata(netlist, vectors, dt, total)
+        if settle not in data:
+            raise RuntimeError(f"稳态判据向量 {settle} 不存在；网表里没有这个节点")
+        t, v = data[settle]
+        stats = _analyze_last(t, v, freq, min(5, max(1, cycles // 2)), 1000)
+        attempts = attempt + 1
+        if last is not None and _settled(last, stats):
+            settled = True
+            break
+        last, total, cycles = stats, total * 2, cycles * 2
+    grid = np.linspace(t[-1] - window_cycles / freq, t[-1],
+                       window_cycles * points_per_cycle, endpoint=False)
+    y = {k: np.interp(grid, t, v) for k, (t, v) in data.items()}
+    return {"t": grid - grid[0], "y": y, "settled": settled, "attempts": attempts}
+
+
+def _wrdata(netlist: str, vectors: list[str], dt: float, total: float):
+    """执行 .tran 并用 wrdata 把指定向量导出为文本列。"""
+    body = re.sub(r"(?im)^\s*\.end\s*$", "", netlist)
+    body = re.sub(r"(?im)^\s*\.tran[^\n]*$", "", body)
+
+    def fname(v: str) -> str:
+        return re.sub(r"[^\w]", "_", v)
+
+    script = (
+        body
+        + f"\n.tran {dt:g} {total:g}\n.control\nrun\n"
+        + "".join(f"wrdata {fname(v)}.dat {v}\n" for v in vectors)
+        + "quit\n.endc\n.end\n"
+    )
+    with tempfile.TemporaryDirectory() as td:
+        cir = Path(td) / "t.cir"
+        cir.write_text(script)
+        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, text=True, cwd=td)
+        data = {}
+        for v in vectors:
+            f = Path(td) / f"{fname(v)}.dat"
+            if not f.exists():
+                continue
+            arr = np.loadtxt(f)
+            if arr.ndim == 2 and arr.shape[1] >= 2:
+                data[v] = (arr[:, 0], arr[:, 1])
+        missing = [v for v in vectors if v not in data and v not in _WARNED]
+        if missing:
+            # 例如 v(e) 而发射极直接接 0：该节点不存在，调用方按 0 处理
+            _WARNED.update(missing)
+            print(f"  note: 向量 {', '.join(missing)} 不存在（按 0 处理）", flush=True)
+        return data
 
 
 def max_undistorted(netlist: str, source: str, node: str, freq: float,
