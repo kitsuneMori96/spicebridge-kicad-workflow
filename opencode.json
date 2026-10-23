@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "spicebridge": {
+        "type": "local",
+        "command": [
+          "/home/kitsunemori/.local/bin/spicebridge"
+        ],
+        "environment": {
+          "PATH": "/home/kitsunemori/.local/bin:/usr/local/bin:/usr/bin:/bin"
+        }
+      }
+    }
+  }
+}
