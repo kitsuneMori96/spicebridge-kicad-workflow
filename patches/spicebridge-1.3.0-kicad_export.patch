@@ -188,7 +188,20 @@
  
      return positions
  
-@@ -286,7 +379,7 @@
+@@ -215,9 +308,10 @@
+         for i in range(len(pin_list) - 1):
+             x1, y1 = pin_list[i]
+             x2, y2 = pin_list[i + 1]
+-            # Manhattan L-route: horizontal then vertical
++            # Manhattan L-route: horizontal then vertical. Pin positions sit on
++            # the 1.27 mm half-grid, so the elbow must reuse them verbatim.
+             if x1 != x2 and y1 != y2:
+-                mid = (_snap_to_grid(x2), _snap_to_grid(y1))
++                mid = (x2, y1)
+                 wires.append(Wire((x1, y1), mid))
+                 wires.append(Wire(mid, (x2, y2)))
+                 if i > 0:
+@@ -286,7 +380,7 @@
  
  _LIB_SYMBOL_TEMPLATES: dict[str, str] = {
      "Device:R": """
@@ -197,7 +210,7 @@
        (property "Reference" "R" (at 2.032 0 90) (effects (font (size 1.27 1.27))))
        (property "Value" "R" (at -2.032 0 90) (effects (font (size 1.27 1.27))))
        (property "Footprint" "" (at -1.778 0 90) (effects (font (size 1.27 1.27)) hide))
-@@ -302,7 +395,7 @@
+@@ -302,7 +396,7 @@
        )
      )""",
      "Device:C": """
@@ -206,7 +219,7 @@
        (property "Reference" "C" (at 2.032 0 90) (effects (font (size 1.27 1.27))))
        (property "Value" "C" (at -2.032 0 90) (effects (font (size 1.27 1.27))))
        (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-@@ -321,7 +414,7 @@
+@@ -321,7 +415,7 @@
        )
      )""",
      "Device:L": """
@@ -215,7 +228,7 @@
        (property "Reference" "L" (at 2.032 0 90) (effects (font (size 1.27 1.27))))
        (property "Value" "L" (at -2.032 0 90) (effects (font (size 1.27 1.27))))
        (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-@@ -352,7 +445,7 @@
+@@ -352,7 +446,7 @@
        )
      )""",
      "Device:D": """
@@ -224,7 +237,7 @@
        (property "Reference" "D" (at 0 2.54 0) (effects (font (size 1.27 1.27))))
        (property "Value" "D" (at 0 -2.54 0) (effects (font (size 1.27 1.27))))
        (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-@@ -374,7 +467,7 @@
+@@ -374,7 +468,7 @@
        )
      )""",
      "Simulation_SPICE:VDC": """
@@ -233,7 +246,7 @@
        (property "Reference" "V" (at 2.54 2.54 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Value" "VDC" (at 2.54 0 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-@@ -399,7 +492,7 @@
+@@ -399,7 +493,7 @@
        )
      )""",
      "Simulation_SPICE:IDC": """
@@ -242,7 +255,7 @@
        (property "Reference" "I" (at 2.54 2.54 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Value" "IDC" (at 2.54 0 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-@@ -421,7 +514,7 @@
+@@ -421,7 +515,7 @@
        )
      )""",
      "Device:Q_NPN_BCE": """
@@ -251,7 +264,7 @@
        (property "Reference" "Q" (at 5.08 1.905 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Value" "Q_NPN_BCE" (at 5.08 0 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Footprint" "" (at 5.08 -1.905 0) (effects (font (size 1.27 1.27)) hide))
-@@ -447,7 +540,7 @@
+@@ -447,7 +541,7 @@
        )
      )""",
      "Device:Q_PNP_BCE": """
@@ -260,7 +273,7 @@
        (property "Reference" "Q" (at 5.08 1.905 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Value" "Q_PNP_BCE" (at 5.08 0 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Footprint" "" (at 5.08 -1.905 0) (effects (font (size 1.27 1.27)) hide))
-@@ -473,7 +566,7 @@
+@@ -473,7 +567,7 @@
        )
      )""",
      "Device:Q_NMOS_GDS": """
@@ -269,7 +282,7 @@
        (property "Reference" "Q" (at 5.08 1.905 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Value" "Q_NMOS_GDS" (at 5.08 0 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Footprint" "" (at 5.08 -1.905 0) (effects (font (size 1.27 1.27)) hide))
-@@ -502,7 +595,7 @@
+@@ -502,7 +596,7 @@
        )
      )""",
      "Device:Q_PMOS_GDS": """
@@ -278,7 +291,7 @@
        (property "Reference" "Q" (at 5.08 1.905 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Value" "Q_PMOS_GDS" (at 5.08 0 0) (effects (font (size 1.27 1.27)) (justify left)))
        (property "Footprint" "" (at 5.08 -1.905 0) (effects (font (size 1.27 1.27)) hide))
-@@ -593,9 +686,9 @@
+@@ -593,9 +687,9 @@
  
      # Build pin UUIDs
      pin_lines: list[str] = []
@@ -291,7 +304,7 @@
  
      # Rotation angle for KiCad (uses degrees)
      angle = placed.rotation
-@@ -616,7 +709,6 @@
+@@ -616,7 +710,6 @@
          f'      (uuid "{sym_uuid}")',
      ]
      lines.extend(props)
@@ -299,13 +312,13 @@
      lines.append("      (instances")
      lines.append('        (project ""')
      lines.append(f'          (path "/{sheet_uuid}"')
-@@ -646,18 +738,16 @@
+@@ -646,18 +739,16 @@
      """Emit a GND power port symbol at the given position."""
      sym_uuid = _uid()
      return (
 -        f'    (symbol (lib_id "power:GND") (at {x} {y + 2.54} 0)\n'
 -        f"      (mirror y)\n"
-+        f'    (symbol (lib_id "power:GND") (at {x} {y} 0)\n' 
++        f'    (symbol (lib_id "power:GND") (at {x} {y} 0)\n'
          f'      (uuid "{sym_uuid}")\n'
 -        f'      (property "Reference" "#PWR?" (at {x} {y + 3.81} 0)\n'
 +        f'      (property "Reference" "#PWR?" (at {x} {y + 1.27} 0)\n'
@@ -321,7 +334,7 @@
          f"      (instances\n"
          f'        (project ""\n'
          f'          (path "/{sheet_uuid}"\n'
-@@ -682,7 +772,7 @@
+@@ -682,7 +773,7 @@
  def _emit_net_label(x: float, y: float, name: str) -> str:
      """Emit a net label."""
      return (
@@ -330,7 +343,7 @@
          f"      (effects (font (size 1.27 1.27)))\n"
          f'      (uuid "{_uid()}")\n'
          f"    )"
-@@ -712,7 +802,7 @@
+@@ -712,7 +803,7 @@
          )
        )
        (symbol "GND_1_1"
@@ -339,7 +352,7 @@
        )
      )"""
  
-@@ -788,8 +878,9 @@
+@@ -788,8 +879,9 @@
      # Lib symbols
      lib_sym = _build_lib_symbols(used_lib_ids)
      if ground_positions:
