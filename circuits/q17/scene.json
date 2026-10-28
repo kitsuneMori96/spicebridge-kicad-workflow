@@ -1,0 +1,386 @@
+{
+  "version": 1,
+  "total_duration": 21.2,
+  "title": "共射放大器 · 最大不失真输出",
+  "subtitle": "教材第 17 题 · Vcc = 12 V，Rc = RL = 3 kΩ",
+  "footnote": "数据：ngspice 瞬态（自动稳态）+ 倍增幅值扫描；原理图：KiCad 导出。",
+  "data": {
+    "amp": 0.05,
+    "freq": 1000,
+    "window_cycles": 3,
+    "points_per_cycle": 400,
+    "probe": {"q": "Q1", "source": "VIC"},
+    "circuit": {"vcc": "VCC", "rc": "R2", "rl": "R3"},
+    "sweep": {
+      "amplitudes": [0.02, 0.05, 0.1, 0.2],
+      "window_cycles": 1,
+      "points_per_cycle": 200
+    }
+  },
+  "scenes": [
+    {
+      "id": "given",
+      "layout": "card",
+      "duration": 3.0,
+      "title": "题目给了什么？",
+      "subtitle": "先看清条件，再把公式里的符号和原理图对上",
+      "elements": [
+        {
+          "type": "bullets",
+          "pos": [42, 150],
+          "gap": 44,
+          "size": 16,
+          "items": [
+            {"text": "V_{CC} = {{circuit.vcc:.0f}} V，R_{c} = R_{L} = {{circuit.rc_kohm:.0f}} kΩ", "at": 0.2},
+            {"text": "Q：U_{CEQ} ≈ {{op.u_ceq:.2f}} V，I_{CQ} ≈ {{op.icq:.2f}} mA", "at": 0.7},
+            {"text": "输入 {{data.amp_mv:.0f}} mV / {{data.freq_hz:.0f}} Hz 正弦", "at": 1.2},
+            {"text": "求：最大不失真输出 U_{o}", "at": 1.7, "accent": true}
+          ]
+        },
+        {
+          "type": "text",
+          "pos": [42, 340],
+          "size": 14,
+          "color": "muted",
+          "gap": 22,
+          "lines": [
+            "直流：R1 / R2 把 Q 点偏置在放大区",
+            "交流：C1 / C2 耦合，Rc 与 RL 共同决定负载"
+          ],
+          "at": 2.0
+        },
+        {
+          "type": "badge",
+          "pos": [220, 420],
+          "text": "先直流，后交流",
+          "kind": "accent",
+          "at": 2.3
+        },
+        {
+          "type": "schematic",
+          "pos": [500, 112, 440, 330],
+          "view": [60, 28, 108, 68],
+          "caption": "KiCad 原理图（局部）· 仿真输入按 50 mV / 1 kHz 重设",
+          "highlights": [
+            {"ref": "R2", "box": [127.5, 44.4, 135.6, 52.2], "at": 0.4, "label": "R_{c}"},
+            {"ref": "R3", "box": [156.7, 67.3, 164.6, 75.0], "at": 0.7, "label": "R_{L}"},
+            {"ref": "Q1", "box": [124.5, 61.5, 132.5, 72.5], "at": 1.0, "label": "Q1"},
+            {"ref": "C2", "box": [143.0, 61.4, 149.1, 65.6], "at": 1.3, "label": "C_{2}"}
+          ],
+          "paths": [
+            {
+              "points": [[78.7, 66.0], [91.4, 66.0], [124.5, 66.0], [129.5, 63.5],
+                          [143.5, 63.5], [148.6, 63.5], [158.8, 63.5], [158.8, 71.1]],
+              "style": "signal",
+              "at": 1.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "qpoint",
+      "layout": "derivation",
+      "duration": 3.4,
+      "title": "静态工作点：C2 对直流开路",
+      "subtitle": "直流负载只有 Rc，Q 点落在直流负载线上",
+      "elements": [
+        {
+          "type": "formula",
+          "pos": [42, 155],
+          "size": 17,
+          "gap": 40,
+          "lines": [
+            {"text": "I_{CQ} = (V_{CC} - U_{CEQ}) / R_{c}", "at": 0.2},
+            {"text": "= ({{circuit.vcc:.0f}} - {{op.u_ceq:.2f}}) / {{circuit.rc_kohm:.0f}} kΩ", "at": 0.8},
+            {"text": "= [[{{op.icq:.2f}} mA]]", "at": 1.4},
+            {"text": "U_{CEQ} = V_{CC} - I_{CQ} R_{c}", "at": 2.0},
+            {"text": "= [[{{op.u_ceq:.2f}} V]]", "at": 2.5}
+          ]
+        },
+        {
+          "type": "text",
+          "pos": [42, 390],
+          "size": 13.5,
+          "color": "muted",
+          "gap": 22,
+          "lines": [
+            "C2 隔直：输出端对直流没有负载，",
+            "所以直流负载线只由 Rc 决定。"
+          ],
+          "at": 2.7
+        },
+        {
+          "type": "plot",
+          "pos": [470, 112, 470, 340],
+          "xlim": [0, 12.5],
+          "ylim": [0, 4.8],
+          "xlabel": "u_CE (V)",
+          "ylabel": "i_C (mA)",
+          "series": [
+            {"ref": "load.dc", "style": "line", "color": "dc", "stroke_width": 2.2,
+             "reveal": [0.4, 1.5], "at": 0.4},
+            {"ref": "qpoint", "style": "dot", "color": "main", "r": 5.5,
+             "label": "Q ({{op.u_ceq:.2f}} V, {{op.icq:.2f}} mA)", "at": 1.7}
+          ],
+          "guides": [
+            {"from": "qpoint", "axis": "x", "label": "U_{CEQ}", "at": 2.0},
+            {"from": "qpoint", "axis": "y", "label": "I_{CQ}", "at": 2.3}
+          ],
+          "annotations": [
+            {"text": "DC 负载线", "x": 8.6, "y": 1.2, "color": "dc", "at": 1.0},
+            {"text": "V_{CC}/R_{c} = {{calc.ic_dc_max_ma:.0f}} mA", "x": 0.35, "y": 4.25, "color": "dc", "at": 1.5},
+            {"text": "U_{CEQ} → {{circuit.vcc:.0f}} V 截止点", "x": 7.2, "y": 4.3, "color": "muted", "at": 2.2}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "acload",
+      "layout": "derivation",
+      "duration": 4.0,
+      "title": "交流负载线：Rc 与 RL 并联",
+      "subtitle": "Vcc 交流接地、C2 短路，负载从 {{circuit.rc_kohm:.0f}} kΩ 变成 {{calc.rac_kohm:.1f}} kΩ",
+      "elements": [
+        {
+          "type": "formula",
+          "pos": [42, 150],
+          "size": 17,
+          "gap": 38,
+          "lines": [
+            {"text": "V_{CC} 交流接地，C_{2} 短路", "at": 0.2},
+            {"text": "R_{ac} = R_{c} ∥ R_{L}", "at": 0.7},
+            {"text": "= {{circuit.rc_kohm:.0f}}k ∥ {{circuit.rl_kohm:.0f}}k = [[{{calc.rac_kohm:.1f}} kΩ]]", "at": 1.2},
+            {"text": "Δi_{C} = -Δu_{CE} / R_{ac}", "at": 1.8},
+            {"text": "斜率 = -1/{{calc.rac_kohm:.1f}} kΩ = [[{{calc.slope_ma_v:.3f}} mA/V]]", "at": 2.3},
+            {"text": "过 Q 点：{{calc.u_ce_cutoff_v:.2f}} V ↔ {{calc.ic_ac_max_ma:.2f}} mA", "at": 2.9, "accent": true}
+          ]
+        },
+        {
+          "type": "text",
+          "pos": [42, 410],
+          "size": 13,
+          "color": "muted",
+          "gap": 21,
+          "lines": [
+            "Rac 更小 → 负载线更陡 → 同样的 u_CE 摆幅",
+            "只需要更小的 i_C 摆幅，输出更容易先碰墙。"
+          ],
+          "at": 3.2
+        },
+        {
+          "type": "plot",
+          "pos": [470, 112, 470, 340],
+          "xlim": [0, 12.5],
+          "ylim": [0, 6.5],
+          "xlabel": "u_CE (V)",
+          "ylabel": "i_C (mA)",
+          "series": [
+            {"ref": "load.dc", "style": "dash", "color": "muted", "stroke_width": 1.4,
+             "reveal": [0, 0.5], "at": 0},
+            {"ref": "load.ac", "style": "line", "color": "locus", "stroke_width": 2.4,
+             "reveal": [0.9, 2.1], "at": 0.9},
+            {"ref": "qpoint", "style": "dot", "color": "main", "r": 5.5, "at": 1.8}
+          ],
+          "triangles": [
+            {"origin": "qpoint", "dx": 1.0, "dy": "{{calc.slope_ma_v}}", "at": 2.4,
+             "labels": {"dx": "Δu = 1 V", "dy": "Δi = {{calc.slope_abs_ma_v:.3f}} mA"}}
+          ],
+          "annotations": [
+            {"text": "DC", "x": 9.8, "y": 0.65, "color": "muted", "at": 0.5},
+            {"text": "AC 负载线", "x": 2.2, "y": 5.75, "color": "locus", "at": 2.0},
+            {"text": "斜率 {{calc.slope_ma_v:.3f}} mA/V", "x": 6.6, "y": 4.5, "color": "locus", "at": 2.6}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "walls",
+      "layout": "compare",
+      "duration": 3.8,
+      "title": "三种口径，都指向约 2 V",
+      "subtitle": "教材估算、50 mV 实测波形、倍增幅值扫描分开写",
+      "elements": [
+        {
+          "type": "table",
+          "pos": [42, 130, 610, 250],
+          "size": 13,
+          "row_height": 44,
+          "header_height": 32,
+          "columns": [
+            {"label": "口径", "width": 1.5},
+            {"label": "正峰", "width": 1.05, "align": "end"},
+            {"label": "负峰", "width": 1.05, "align": "end"},
+            {"label": "U_{o}", "width": 1.15, "align": "end"}
+          ],
+          "rows": [
+            {"cells": ["教材估算", "+{{textbook.pos:.2f}} V", "-{{textbook.neg_abs:.2f}} V",
+                       "{{textbook.rms:.2f}} Vrms"], "at": 0.3},
+            {"cells": ["50 mV 波形", "{{wave.pk_pos:+.2f}} V", "-{{wave.pk_neg_abs:.2f}} V",
+                       "{{wave.u_o_rms:.2f}} Vrms"], "at": 0.8},
+            {"cells": ["倍增幅值扫描", "{{walls.pos:+.2f}} V", "-{{walls.neg_abs:.2f}} V",
+                       "{{walls.rms:.2f}} Vrms"], "at": 1.3},
+            {"cells": ["结论", "最高 +{{wave.pk_pos:.2f}} V", "不是瓶颈",
+                       "[[≈2 V → A]]"], "at": 2.0, "highlight": true}
+          ]
+        },
+        {
+          "type": "bullets",
+          "pos": [700, 152],
+          "size": 12.5,
+          "gap": 29,
+          "items": [
+            {"text": "正峰是瓶颈", "at": 1.6, "accent": true},
+            {"text": "截止侧先碰墙", "at": 1.8},
+            {"text": "50 mV 正峰 {{wave.pk_pos:+.2f}} V", "at": 2.1},
+            {"text": "扫描正峰 {{walls.pos:+.2f}} V", "at": 2.35},
+            {"text": "负峰可达 -{{walls.neg_abs:.2f}} V", "at": 2.6},
+            {"text": "教材 {{textbook.neg:+.1f}} V 偏保守", "at": 2.85}
+          ]
+        },
+        {
+          "type": "text",
+          "pos": [700, 350],
+          "size": 12,
+          "color": "muted",
+          "gap": 20,
+          "lines": [
+            "输入再加大：耦合电容整流",
+            "工作点下移，正峰反降"
+          ],
+          "at": 3.0
+        },
+        {
+          "type": "badge",
+          "pos": [820, 438],
+          "text": "答案仍取正峰",
+          "kind": "accent",
+          "at": 3.3
+        }
+      ]
+    },
+    {
+      "id": "zoom",
+      "layout": "plot",
+      "duration": 4.2,
+      "title": "波形族：正峰先长后压，负峰继续变深",
+      "subtitle": "输入 20 / 50 / 100 / 200 mV，最后一周期输出波形",
+      "elements": [
+        {
+          "type": "plot",
+          "pos": [70, 112, 560, 320],
+          "xlim": [0, 0.001],
+          "ylim": [-8.9, 3.4],
+          "x_scale": 1000,
+          "xlabel": "t (ms)",
+          "ylabel": "u_o (V)",
+          "series": [
+            {"ref": "sweep.out.20m", "style": "line", "color": "input", "stroke_width": 1.4, "at": 0.2},
+            {"ref": "sweep.out.50m", "style": "line", "color": "main", "stroke_width": 2.4, "at": 0.45},
+            {"ref": "sweep.out.100m", "style": "line", "color": "locus", "stroke_width": 1.6, "at": 0.7},
+            {"ref": "sweep.out.200m", "style": "line", "color": "limit", "stroke_width": 1.8, "at": 0.95}
+          ],
+          "bands": [
+            {"x0": 0.0006, "x1": 0.00085, "color": "accent", "opacity": 0.07, "at": 1.2}
+          ],
+          "limits": [
+            {"value": "{{walls.pos}}", "label": "扫描正峰 {{walls.pos:+.2f}} V", "color": "accent", "dash": "4 4", "at": 1.5},
+            {"value": "{{walls.neg}}", "label": "负峰 {{walls.neg:+.2f}} V", "color": "accent", "dash": "4 4", "at": 1.7}
+          ]
+        },
+        {"type": "text", "pos": [72, 450], "size": 10.5, "color": "input", "at": 1.2,
+         "text": "20 mV 峰 {{sweep.20m.pk_pos:+.2f}} V"},
+        {"type": "text", "pos": [205, 450], "size": 10.5, "color": "main", "at": 1.3,
+         "text": "50 mV 峰 {{sweep.50m.pk_pos:+.2f}} V"},
+        {"type": "text", "pos": [338, 450], "size": 10.5, "color": "locus", "at": 1.4,
+         "text": "100 mV 峰 {{sweep.100m.pk_pos:+.2f}} V"},
+        {"type": "text", "pos": [471, 450], "size": 10.5, "color": "limit", "at": 1.5,
+         "text": "200 mV 峰 {{sweep.200m.pk_pos:+.2f}} V"},
+        {
+          "type": "plot",
+          "pos": [650, 112, 280, 320],
+          "title": "正峰放大",
+          "xlim": [0.0005, 0.00085],
+          "ylim": [1.3, 3.0],
+          "x_scale": 1000,
+          "xlabel": "t (ms)",
+          "ylabel": "u_o (V)",
+          "series": [
+            {"ref": "sweep.out.20m", "style": "line", "color": "input", "stroke_width": 1.4, "at": 1.7},
+            {"ref": "sweep.out.50m", "style": "line", "color": "main", "stroke_width": 2.4, "at": 1.8},
+            {"ref": "sweep.out.100m", "style": "line", "color": "locus", "stroke_width": 1.6, "at": 1.9},
+            {"ref": "sweep.out.200m", "style": "line", "color": "limit", "stroke_width": 1.8, "at": 2.0}
+          ],
+          "limits": [
+            {"value": "{{walls.pos}}", "label": "扫描 {{walls.pos:+.2f}} V", "label_anchor": "start", "color": "accent", "dash": "4 4", "at": 2.2}
+          ],
+          "annotations": [
+            {"text": "50 mV 峰值仍可达 {{wave.pk_pos:+.2f}} V", "x": 0.000503, "y": 2.93, "color": "main", "size": 10, "at": 2.5},
+            {"text": "扫描值只是离散采样的最大值", "x": 0.000503, "y": 2.78, "color": "accent", "size": 9.5, "at": 2.8}
+          ]
+        },
+        {
+          "type": "formula",
+          "pos": [70, 478],
+          "size": 16,
+          "gap": 28,
+          "lines": [
+            {"text": "U_{o} = min(正峰, |负峰|) / √2", "at": 2.9},
+            {"text": "≈ {{answer.rms_lo:.2f}}–{{answer.rms_hi:.2f}} Vrms ≈ [[2 V]]", "at": 3.3}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "layout": "summary",
+      "duration": 2.8,
+      "title": "结论：选 A，Uo ≈ 2 V",
+      "subtitle": "截止侧正峰先碰墙，最大不失真输出由它决定",
+      "elements": [
+        {
+          "type": "answer",
+          "pos": [430, 210],
+          "text": "A",
+          "sub": "U_{o} ≈ {{answer.rms_lo:.2f}}–{{answer.rms_hi:.2f}} Vrms ≈ 2 V",
+          "size": 96,
+          "at": 0.2
+        },
+        {
+          "type": "bullets",
+          "pos": [70, 340],
+          "size": 14,
+          "gap": 34,
+          "items": [
+            {"text": "R_{ac} = R_{c} ∥ R_{L} = {{calc.rac_kohm:.1f}} kΩ，交流负载线更陡", "at": 0.6},
+            {"text": "正峰先碰截止墙，最高约 +{{wave.pk_pos:.2f}} V", "at": 1.0},
+            {"text": "U_{o} = min(正峰, |负峰|)/√2 ≈ 2 V，选 A", "at": 1.4, "accent": true}
+          ]
+        },
+        {
+          "type": "text",
+          "pos": [70, 470],
+          "size": 11,
+          "color": "muted",
+          "lines": ["所有数值来自同一批 ngspice 瞬态与幅值扫描数据"],
+          "at": 1.8
+        },
+        {
+          "type": "schematic",
+          "pos": [690, 140, 270, 230],
+          "view": [118, 55, 50, 26],
+          "caption": "输出回路：Q1 → C2 → R_{L}",
+          "highlights": [
+            {"ref": "Q1", "box": [124.5, 61.5, 132.5, 72.5], "at": 1.7},
+            {"ref": "C2", "box": [143.0, 61.4, 149.1, 65.6], "at": 1.9},
+            {"ref": "R3", "box": [156.7, 67.3, 164.6, 75.0], "at": 2.1}
+          ],
+          "paths": [
+            {"points": [[129.5, 63.5], [143.5, 63.5], [148.6, 63.5], [158.8, 63.5], [158.8, 74.9]],
+             "style": "signal", "at": 2.2}
+          ]
+        }
+      ]
+    }
+  ]
+}

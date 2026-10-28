@@ -212,6 +212,72 @@ spec 里带 `anim` 段时，`run.py` 会额外产出 `out/<name>/<name>_anim.svg
 不支持 SMIL 的渲染器（cairosvg、打印、部分预览器）看到的是静态全波形：
 描边动画的初始值就是「已画完」，所以不会白图。
 
+## 讲解动画（scene）
+
+`q17_anim.svg` 只重播仿真波形；`scene` 把同一道题拆成六幕，放在一条 21.2 s 的
+全局时间轴上：
+
+| # | 场景 | 讲什么 |
+|---|---|---|
+| 1 | 题目条件 | Vcc / Rc / RL、Q 点、输入 50 mV / 1 kHz；原理图逐器件高亮、输出回路流动 |
+| 2 | 静态工作点 | C2 直流开路 → DC 负载线 (0, 4 mA)→(12 V, 0)，Q 点向两轴投影 |
+| 3 | 交流负载线 | Vcc 交流接地、C2 短路 → Rac = Rc∥RL = 1.5 kΩ，斜率三角形量出 −0.667 mA/V |
+| 4 | 三种口径 | 教材、50 mV 波形、倍增幅值扫描并排；结论行高亮 |
+| 5 | 波形族 | 20 / 50 / 100 / 200 mV 输出同屏：正峰先长后压，负峰持续变深 |
+| 6 | 结论 | Uo ≈ 1.79–1.94 Vrms ≈ 2 V，选 A（2 V） |
+
+![q17 六幕讲解动画](docs/q17_scene.svg)
+
+实现约束：
+
+- 纯 SMIL、单文件、无 JS / 外部资源，GitHub README 的 `<img>` 直接播放；
+- 全局时间轴：所有 `animate` 的 `dur` 都等于 total_duration，统一 `keyTimes`，
+  不用 `begin` / `end`，六幕不会漂移；
+- 不支持 SMIL 的渲染器（cairosvg、打印）看到静态海报：标题、答案、波形、三口径表
+  都在，不会白图；动画层在海报消失后才开始；
+- 场景由 `circuits/q17/scene.json` 声明，文字里的 `{{path:format}}` 在渲染时从
+  ngspice 结果注入，不手写关键数值；未知路径直接报错。
+
+`scene.json` 最小示例：
+
+```json
+{
+  "version": 1,
+  "data": { "amp": 0.05, "freq": 1000, "probe": { "q": "Q1", "source": "VIC" } },
+  "scenes": [
+    {
+      "id": "given", "layout": "card", "duration": 3.0,
+      "title": "题目给了什么？",
+      "elements": [
+        { "type": "bullets", "pos": [42, 130],
+          "items": [{ "text": "V_{CC}=12 V，R_{c}=R_{L}=3 kΩ", "at": 0.2 }] }
+      ]
+    }
+  ]
+}
+```
+
+命令：
+
+```bash
+python3 scene_anim.py circuits/q17 --check           # 只校验数据 / 模板 / 引用
+python3 scene_anim.py circuits/q17 --still all --png # 六张静态审阅图
+python3 scene_anim.py circuits/q17 --png             # 完整动画 + 海报 PNG
+```
+
+`run.py circuits/q17` 在 `spec.json` 带 `"scene": {"file": "scene.json"}` 时也会
+自动生成 `out/q17/q17_scene.svg`（放在原理图导出之后，嵌入真实 KiCad SVG）。
+
+三种口径为什么都指向 2 V：
+
+- 教材按 +3.0 / −5.3 V 的理想墙估算，取较小的正峰 → 3.0/√2 = 2.12 Vrms；
+- 50 mV 实际波形正峰 +2.74 V、负峰 −6.02 V → 1.94 Vrms；
+- 倍增幅值扫描在更大输入下正峰被耦合电容的整流效应压低到 +2.53 V、
+  负峰到 −8.04 V → 1.79 Vrms。
+
+扫描值不是一条绝对水平墙：它和 +2.74 V 一起说明「正峰大约 2.5–2.7 V」。
+真正先限制输出的是截止侧的正峰，所以答案仍是 A（2 V）。
+
 ## 教材例题索引
 
 模电「共射放大器」系列选择题的完整闭环案例：网表 → MCP 仿真 → 瞬态扫描 →
@@ -219,7 +285,7 @@ KiCad 原理图 → 校验 PASS。
 
 | 题 | 考点 | 电路 | 仿真实测 | 答案 |
 |---|---|---|---|---|
-| 17 | 最大不失真输出电压 Uo | `circuits/q17` | U_CEQ=6.05 V；削顶墙 +2.53/−8.04 V → Uo=1.79 V rms | **A（2 V）**，截止侧先碰墙 |
+| 17 | 最大不失真输出电压 Uo | `circuits/q17` | U_CEQ=6.05 V；削顶墙 +2.53/−8.04 V → Uo=1.79–1.94 Vrms（扫描 1.79 / 50 mV 波形 1.94） | **A（2 V）**，截止侧先碰墙 |
 | 18 | 分压偏置求 U_CEQ | `circuits/q18` | v(b)=2.64 V, v(e)=1.85 V, v(c)=6.50 V → U_CEQ=4.64 V | **B（4.5 V）** |
 | 19 | 画交流等效电路 | 概念题，对照 q18/q20 两份网表 | Ce 是否存在决定 Re 进不进交流通路 | **B** |
 | 20 | 求电压增益 A_u | `circuits/q20`（= q18 去掉 Ce） | \|Au\|=3.21 dB=1.45 倍（含 Re 负反馈） | **A（−1.5）** |

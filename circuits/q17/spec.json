@@ -10,6 +10,9 @@
     "node": "out",
     "freq": 1000
   },
+  "scene": {
+    "file": "scene.json"
+  },
   "anim": {
     "title": "共射放大器 · 最大不失真输出的两道墙",
     "subtitle": "Vcc=12 V, Rc=RL=3 kΩ, U_CEQ≈6.05 V, I_CQ≈2.0 mA   (q17)",

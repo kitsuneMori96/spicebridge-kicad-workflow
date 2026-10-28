@@ -13,7 +13,8 @@ A circuit directory holds:
         "tran": {"source": "V1", "node": "out", "freq": 1000, "amp": 0.03},
         "clipping_wall": {"source": "V1", "node": "out", "freq": 1000},
         "max_undistorted": {"source": "V1", "node": "out", "freq": 1000, "thd": 1.0},
-        "anim": {"source": "V1", "amp": 0.05, "freq": 1000, "traces": [...]}
+        "anim": {"source": "V1", "amp": 0.05, "freq": 1000, "traces": [...]},
+        "scene": {"file": "scene.json"}
     }
 
 Steps:
@@ -22,7 +23,8 @@ Steps:
   3. schematic generation from the hand-written layout
   4. verification with real KiCad (kicad-cli netlist + ERC)
   5. SVG/PNG render, with the PNG checked before we claim success
-  6. optional SVG animation (svg_anim.py) driven by the same netlist
+  6. optional SVG animation (svg_anim.py) and explanation scenes (scene_anim.py),
+     both driven by the same netlist/simulation data
 
 Exit code 0 only if KiCad verification passes.
 """
@@ -60,8 +62,9 @@ def simulate(netlist: str, spec: dict) -> dict:
     return asyncio.run(flow.run(steps, verbose=False))
 
 
-def run_transient(netlist: str, spec: dict) -> None:
+def run_transient(netlist: str, spec: dict) -> dict:
     """Optional tran.py checks: steady-state waveform, clipping wall, THD scan."""
+    results = {}
     for key in ("tran", "clipping_wall", "max_undistorted"):
         cfg = spec.get(key)
         if not cfg:
@@ -95,6 +98,8 @@ def run_transient(netlist: str, spec: dict) -> None:
                 f"(converged={r.get('converged', True)})",
                 flush=True,
             )
+        results[key] = r
+    return results
 
 
 def render(sch: Path, out: Path, name: str) -> bool:
@@ -162,9 +167,10 @@ def main() -> int:
                 f"f_3dB {r.get('f_3dB_hz')}"
             )
 
+    tran_results = {}
     if any(k in spec for k in ("tran", "clipping_wall", "max_undistorted")):
         print(f"== {name}: transient ==", flush=True)
-        run_transient(netlist, spec)
+        tran_results = run_transient(netlist, spec)
 
     sch = out / f"{name}.kicad_sch"
     print(f"== {name}: schematic ==", flush=True)
@@ -184,6 +190,9 @@ def main() -> int:
         print("RESULT: FAIL")
         return 1
 
+    print(f"== {name}: render ==", flush=True)
+    ok = render(sch, out, name)
+
     anim = spec.get("anim")
     if anim:
         print(f"== {name}: SVG animation ==", flush=True)
@@ -191,8 +200,21 @@ def main() -> int:
         ap = svg_anim.build(cdir, out / f"{name}_anim.svg")
         print(f"  anim: {ap} ({ap.stat().st_size / 1024:.0f} KiB)", flush=True)
 
-    print(f"== {name}: render ==", flush=True)
-    ok = render(sch, out, name)
+    if spec.get("scene"):
+        print(f"== {name}: explanation scenes ==", flush=True)
+        svg_path = out / f"{name}.svg"
+        if not svg_path.exists():
+            print("  scene skipped: schematic svg missing", flush=True)
+        else:
+            try:
+                import scene_anim
+                paths = scene_anim.build(cdir, out / f"{name}_scene.svg",
+                                         sim=tran_results or None)
+                sp = paths[0]
+                print(f"  scene: {sp} ({sp.stat().st_size / 1024:.0f} KiB)", flush=True)
+            except Exception as e:
+                print(f"  WARNING: scene failed: {e}", flush=True)
+
     print(f"\nRESULT: {'PASS' if ok else 'PASS (render failed)'} -> {sch}", flush=True)
     return 0
 
