@@ -1,0 +1,12 @@
+* 教材 T4.2 固定偏置共射放大器（GP 模型匹配题给参数）
+* 已知：Cmu=4pF, fT=50MHz, rbb'=100, beta0=80
+* CJE=50p + TF*gm(2.4n*69.5m=167p) => Cpi=217p, fT=gm/(2pi*(Cpi+Cmu))=50MHz
+VCC vcc 0 12
+V1 in 0 AC 1
+RS in a 1k
+C1 a b 5u
+RB vcc b 500k
+Q1 c b 0 QX
+RC vcc c 5k
+.model QX NPN(IS=3.7e-15 BF=80 RB=100 CJE=50p TF=2.4n CJC=4p VJC=100 MJC=0 VJE=100 MJE=0)
+.end

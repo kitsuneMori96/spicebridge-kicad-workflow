@@ -1,0 +1,13 @@
+* T4.2 小信号混合π等效电路（线性化教材参数，用于核对手算链路）
+* gm=69.5mS, rb'e=1.15k, rbb'=100, Cpi=217p, Cmu=4p, Rc=5k, Rb=500k, Rs=1k, C1=5u
+V1 in 0 AC 1
+RS in a 1k
+C1 a b 5u
+RB b 0 500k
+RBB b bi 100
+RBE bi 0 1.15k
+CPI bi 0 217p
+CMU bi c 4p
+G1 c 0 bi 0 69.5m
+RC c 0 5k
+.end

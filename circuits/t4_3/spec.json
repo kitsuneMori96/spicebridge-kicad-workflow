@@ -1,0 +1,11 @@
+{
+  "op": true,
+  "ac": { "start": 0.1, "stop": 10000000, "ppd": 50 },
+  "bode": {
+    "title": "教材 T4.3 · 放大器波特图（ngspice 复现）",
+    "subtitle": "A_u(jf) = 1000·jf/100 / [(1+jf/100)(1+jf/10^4)(1+jf/10^5)]　中频 60 dB，fL=100 Hz，fH≈10 kHz",
+    "freq": { "start": 0.1, "stop": 10000000, "ppd": 50 },
+    "tf": { "gain": 10, "zeros_at_origin": 1, "poles_hz": [100, 10000, 100000] },
+    "out": "out"
+  }
+}
