@@ -14,6 +14,8 @@ spice-projects/
 ├── run.py                 # 一键：仿真 → 瞬态 → 出图 → 校验 → 渲染，结尾 RESULT 行
 ├── flow.py                # 多步 MCP 调用（同一 stdio 会话，circuit_id 才有效）
 ├── tran.py                # 直连 ngspice 批处理：稳态瞬态、THD、削顶墙、最大不失真
+├── bode.py                # 模电波特图：折线近似 + 真实 .ac 曲线逐点比对（讲幅频特性用）
+├── circ.py                # 电路分析：戴维南/一阶三要素/相量/谐振，同样只认真实仿真
 ├── svg_anim.py            # 仿真结果 → 自包含 SVG 动画（纯 SMIL，无 JS）
 ├── mcp_call.py            # 单次 MCP 调用 / 列工具 / 查 schema
 ├── kicad_build.py         # 自带 KiCad 8 原理图生成器（器件库 + 布线 + 引脚坐标 dump）
@@ -154,6 +156,14 @@ RESULT: PASS -> out/q17/q17.kicad_sch
   本机库表。
 - `spicebridge` 的 site-packages 补丁已固化在 `patches/`，重装后跑一次
   `./patches/install.sh` 即可（幂等，`--check` 只查状态）。
+- **本机 ngspice 36 的 `sw` 压控开关只认 `ron/roff/vt/vh`**：手册与 PSpice 常见的
+  `onres/von/voff/swon_res/swoff_res` 都会报 `unrecognized parameter - ignored`。判据是
+  控制电压 ≥ `vt+vh` 导通、≤ `vt−vh` 关断，中间保持原状态；默认 `vt=vh=0` 意味着**控制极
+  给 0 V 就算导通**，开关"断不开"不是 bug 而是默认阈值。换路题一律写
+  `.model ... sw ron=1e-3 roff=1e12 vt=1 vh=0` 再用 ±5 V 方波驱动控制极，见 `circ.switch_lines()`。
+- **感性换路必须把开关做成「先合后断」（make-before-break）**：`L·di/dt` 在无通路的瞬间会撞上
+  `roff=1e12`，打出 1e12 V 级尖峰把数值解冲垮（实测 i_L 从 1.2 A 塌到 3e-5 A）。给断开
+  那只开关加 `t_action` 延迟即可；重叠的几十 ns 里读到的都是过渡值，要等它结束再取 0+。
 
 ## 对 SPICEBridge 的本地补丁（patches/）
 
