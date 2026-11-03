@@ -93,6 +93,12 @@ di0 = 0.004 * (A[0] @ x0 + b[0]) + 0.4 * (A[1] @ x0 + b[1])
 c = np.linalg.solve([[1.0, 1.0], [lam[0], lam[1]]], [i0 - iinf, di0])
 print(f"解析式     : i(t) = {iinf:.6f} + ({c[0]:.6f})·e^({lam[0]:.3f}t)"
       f" + ({c[1]:.6f})·e^({lam[1]:.3f}t) A，t ≥ 0")
+_, V = np.linalg.eig(A)
+a = np.real(np.linalg.solve(V, x0 - xinf))
+Vr = np.real(V)
+for name, row, inf in (("u_C(t)", Vr[0] * a, xinf[0]), ("i_L(t)", Vr[1] * a, xinf[1])):
+    print(f"             {name} = {inf:.6f} + ({row[0]:.6f})·e^({lam[0]:.3f}t)"
+          f" + ({row[1]:.6f})·e^({lam[1]:.3f}t)")
 
 # ---- 5) 真开关瞬态
 sw = swap_line(post, "Rsw", circ.switch_lines(post, "m", "d", close=True, pw=10, per=20))
@@ -105,12 +111,13 @@ sel = t > 1e-6                                    # 开关沿附近不归解析�
 err = float(np.max(np.abs(ii[sel] - i_an[sel])) / 0.24)
 err_uc = float(np.max(np.abs(uc_s[sel] - X[sel, 0])) / 24)
 err_il = float(np.max(np.abs(il_s[sel] - X[sel, 1])) / 0.24)
-kmin_s, kmin_a = int(np.argmin(ii[sel])), int(np.argmin(i_an[sel]))
-imin_s, imin_a = ii[sel][kmin_s], i_an[sel][kmin_a]
-tmin_s, tmin_a = t[sel][kmin_s], t[sel][kmin_a]
+tmin_c = float(np.log(-c[0] * lam[0] / (c[1] * lam[1])) / (lam[1] - lam[0]))   # i'(t)=0 的闭式解
+imin_c = iinf + c[0] * np.exp(lam[0] * tmin_c) + c[1] * np.exp(lam[1] * tmin_c)
+imin_s, tmin_s = float(np.interp(tmin_c, t, ii)), tmin_c       # 仿真曲线在闭式时刻插值
+kgrid = int(np.argmin(ii[sel]))
 print(f"瞬态实测   : i 全程最大偏差 {err:.2e}（相对 0.24 A），曲线与状态方程解对账")
-print(f"非单调核对 : 实测最低 i = {imin_s * 1e3:.4f} mA @ t = {tmin_s * 1e3:.4f} ms"
-      f"；解析 {imin_a * 1e3:.4f} mA @ {tmin_a * 1e3:.4f} ms")
+print(f"非单调核对 : 闭式最低 i = {imin_c * 1e3:.4f} mA @ t = {tmin_c * 1e3:.4f} ms"
+      f"；仿真同点插值 {imin_s * 1e3:.4f} mA（采样网格 argmin 落在 {t[sel][kgrid] * 1e3:.4f} ms）")
 print(f"起点/终点  : i(0+) = {ii[sel][0] * 1e3:.4f} mA   i(∞) = {iinf * 1e3:.4f} mA"
       f"（二者相等，但中途下探）")
 
@@ -125,7 +132,7 @@ check("稳态 v(m) 仿真 vs 解析", abs(m["v(m)"].real - (0.6 * xinf[0] + 60 *
 check("i(t) 实测 vs 状态方程解", err, 2e-3)
 check("u_C(t) 实测 vs 状态方程解", err_uc, 2e-3)
 check("i_L(t) 实测 vs 状态方程解", err_il, 2e-3)
-check("最低点幅值 实测 vs 解析", abs(imin_s - imin_a) / 0.24, 5e-3)
-check("最低点时刻 实测 vs 解析", abs(tmin_s - tmin_a) / tmin_a, 5e-2)
+check("最低点幅值 实测 vs 闭式", abs(imin_s - imin_c) / 0.24, 5e-3)
+check("最低点时刻 实测 vs 闭式", abs(t[sel][kgrid] - tmin_c), 2e-5)     # 采样网格 10 µs
 print("\nRESULT PASS: t7_7" if not bad else f"\nRESULT FAIL: {bad}")
 sys.exit(0 if not bad else 1)
