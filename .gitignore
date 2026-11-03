@@ -9,3 +9,6 @@ smoke/opamp.kicad_sch
 kicad_export.py.orig
 *.net
 smoke/ce_amp.kicad_sch
+
+# Qoder local settings (gitignored)
+.qoder/settings.local.json
