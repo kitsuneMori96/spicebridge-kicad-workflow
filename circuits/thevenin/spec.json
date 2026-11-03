@@ -1,0 +1,16 @@
+{
+  "circ": {
+    "thévenin": {
+      "port": "RP",
+      "nodes": [
+        "c",
+        "0"
+      ],
+      "expect": {
+        "voc": 1.5,
+        "isc": 1.2,
+        "req": 1.25
+      }
+    }
+  }
+}

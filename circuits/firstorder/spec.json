@@ -1,0 +1,10 @@
+{
+  "circ": {
+    "three_element": {
+      "probe": "v(c)",
+      "tstop": 10.0,
+      "dt": 0.002,
+      "expect": { "t0": 0.0, "tinf": 1.5, "tau": 1.0 }
+    }
+  }
+}
