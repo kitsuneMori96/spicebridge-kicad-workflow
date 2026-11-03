@@ -131,7 +131,8 @@ SW_MODEL = ".model swmod sw ron=1e-3 roff=1e12 vt=1 vh=0"
 
 
 def switch_lines(netlist: str, a: str, b: str, close: bool = True,
-                 t_action: float = 0.0, edge: float = 1e-9) -> str:
+                 t_action: float = 0.0, edge: float = 1e-9,
+                 pw: float = 1.0, per: float = 2.0) -> str:
     """换路开关片段：S 器件 + 模型卡 + 方波控制源，`close` 决定 t=0 是闭合还是断开。
 
     控制源用 PULSE 而不是静态电压，直流初始解自然落在 t=0− 的开关状态上（PULSE 取
@@ -142,12 +143,16 @@ def switch_lines(netlist: str, a: str, b: str, close: bool = True,
     感性回路必须**先合后断**：给 `close=False` 那只加 `t_action` 延迟，让新通路先建立，
     否则电感电流瞬间无路可走，撞上 roff 打出 1e12 V 尖峰，数值解当场塌掉（实测 i_L
     从 1.2 A 塌到 3e-5 A）。重叠的那几十 ns 里各量是过渡值，0+ 要等它结束再读。
+
+    `pw`/`per` 是控制方波的脉宽与周期，默认 1 s / 2 s——**仿真时长超过 1 s 时必须抬高**，
+    否则方波在 t=1 s 翻回去，开关自己又变向，后半段曲线测的是第二次换路（题 7-5 的
+    τ=0.5 s、要跑到 8τ=4 s 就撞上这条）。
     """
     on, off = (5.0, -5.0) if close else (-5.0, 5.0)
     s, v = free_name(netlist, "S1"), free_name(netlist, "Vswctl")
     return (f"{s} {a} {b} {v}n 0 swmod\n"
             f"{SW_MODEL}\n"
-            f"{v} {v}n 0 PULSE({off:g} {on:g} {t_action:g} {edge:g} {edge:g} 1 2)\n")
+            f"{v} {v}n 0 PULSE({off:g} {on:g} {t_action:g} {edge:g} {edge:g} {pw:g} {per:g})\n")
 
 
 def insert_series_ammeter(netlist: str, port: str, name: str | None = None) -> tuple[str, str, str]:
