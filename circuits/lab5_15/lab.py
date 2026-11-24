@@ -134,6 +134,11 @@ def _cross_time(t, u, te, thr):
     return float(t[j - 1] + (thr - u[j - 1]) / (u[j] - u[j - 1]) * (t[j] - t[j - 1]))
 
 
+def _cross_time_down(t, u, te, thr):
+    j = np.where((t > te) & (u <= thr))[0][0]
+    return float(t[j - 1] + (thr - u[j - 1]) / (u[j] - u[j - 1]) * (t[j] - t[j - 1]))
+
+
 def tau_cross(t, uo, U, T, te):
     """理想读数：起始电平取换路前的实际值，终值取源的真实幅值。"""
     h = T / 2
@@ -221,8 +226,25 @@ def measure_tau_case(R, C, periods, dt, tmax, rng=None):
     ref = tau_eff(R, C)
     tau_i, u0 = tau_cross(t, uo, U0, T, te)
     tau_rd = tau_scope(t, uo, U0, T, te, timebase_for(ref), rng=rng)
+    tf = te - T / 2
+    u_hi = float(np.median(uo[(t > tf - 0.03 * T) & (t < tf - 0.005 * T)]))
+    u_lo = float(np.median(uo[(t > tf + 0.40 * T) & (t < tf + 0.49 * T)]))
+    thr_f = u_lo + np.exp(-1) * (u_hi - u_lo)
+    tau_f = _cross_time_down(t, uo, tf, thr_f) - tf
     return dict(t=t, us=us, uo=uo, te=te, tau_eff=ref, tau_cross=tau_i,
-                tau_scope=tau_rd, u0=u0)
+                tau_scope=tau_rd, tau_fall=tau_f, u0=u0, u_hi=u_hi, u_lo=u_lo)
+
+
+def small_change(Rs=(9.1e3, R_NOM, 11e3)):
+    """手册①的“少量改变电阻值”：固定 C，观察 τ 与波形的时间轴移动。"""
+    rows = []
+    for R in Rs:
+        d = measure_tau_case(R, C_NOM, 4, 0.5e-6, 1e-7)
+        rows.append(dict(R=R, tau=d["tau_eff"], tau_cross=d["tau_cross"],
+                         tau_scope=d["tau_scope"],
+                         dev_pct=(d["tau_cross"] / d["tau_eff"] - 1) * 100,
+                         t=d["t"], us=d["us"], uo=d["uo"], te=d["te"]))
+    return rows
 
 
 def diff_metrics(R, C=0.01e-6):
@@ -316,43 +338,81 @@ def fig_setup():
 
 def fig_tau(d):
     t, us, uo, te = d["t"], d["us"], d["uo"], d["te"]
-    fig, axs = plt.subplots(1, 2, figsize=(10.2, 3.6))
-    ax = axs[0]
-    m = t <= 2 * T0
-    ax.plot(t[m] * 1e3, us[m], color=COL["src"], lw=1.2, ls="--", label="$u_s$ 方波 0/3 V")
-    ax.plot(t[m] * 1e3, uo[m], color=COL["out"], lw=2.0, label="$u_C$")
-    ax.axhline(0.632 * U0, color=COL["alt"], lw=0.9, ls=":")
-    ax.text(0.12, 0.632 * U0 + 0.08, "0.632$U_s$ = 1.896 V", color=COL["alt"], fontsize=8.5)
-    ax.axvspan(te * 1e3, (te + 5 * d["tau_eff"]) * 1e3, color=COL["band"], alpha=0.18)
-    ax.text(te * 1e3 + 0.03, 2.72, "5τ", color="0.35", fontsize=9)
-    ax.set_xlabel("t / ms")
-    ax.set_ylabel("电压 / V")
-    ax.set_title("(a) 两个周期的充放电波形")
-    ax.set_xlim(0, 2)
-    ax.set_ylim(-0.15, 3.25)
-    ax.text(1.56, 3.13, "$u_s$", color=COL["src"], fontsize=9)
-    ax.text(1.12, 0.42, "$u_C$", color=COL["out"], fontsize=9)
+    tf = te - T0 / 2
+    thr_hi = 0.632 * U0
+    thr_lo = d["u_lo"] + np.exp(-1) * (d["u_hi"] - d["u_lo"])
+    fig = plt.figure(figsize=(10.8, 6.4))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.15, 1.0], height_ratios=[1, 1],
+                          hspace=0.32, wspace=0.22)
+    axs = fig.add_subplot(gs[0, 0])
+    axc = fig.add_subplot(gs[1, 0], sharex=axs)
+    axz = fig.add_subplot(gs[:, 1])
 
-    ax = axs[1]
+    m = t <= 2 * T0
+    axs.plot(t[m] * 1e3, us[m], color=COL["alt"], lw=1.7, drawstyle="steps-post")
+    axs.set_ylim(-0.15, 3.25)
+    axs.set_ylabel("$u_s$ / V")
+    axs.set_title("(a) 激励 $u_s$：0/3 V 方波，$f$ = 1 kHz")
+    axs.tick_params(labelbottom=False)
+    axs.text(1.03, 2.62, "$U_m$ = 3 V", color=COL["alt"], fontsize=9)
+
+    axc.plot(t[m] * 1e3, uo[m], color=COL["out"], lw=2.0)
+    axc.axhline(thr_hi, color=COL["alt"], lw=0.9, ls=":", label="0.632 阈值")
+    axc.axhline(thr_lo, color=COL["ok"], lw=0.9, ls=":", label="0.368 阈值")
+    axc.axvline((te + d["tau_cross"]) * 1e3, color=COL["alt"], lw=1.0, ls="--")
+    axc.axvline((tf + d["tau_fall"]) * 1e3, color=COL["ok"], lw=1.0, ls="--")
+    axc.axvspan(te * 1e3, (te + 5 * d["tau_eff"]) * 1e3, color=COL["band"], alpha=0.18)
+    axc.text(te * 1e3 + 0.03, 2.72, "5τ", color="0.35", fontsize=9)
+    axc.text(0.04, 2.52,
+             f"0.632: {d['tau_cross'] * 1e6:.1f} µs\n0.368: {d['tau_fall'] * 1e6:.1f} µs",
+             fontsize=8.5, va="top",
+             bbox=dict(boxstyle="round", fc="white", ec="0.8", alpha=0.9))
+    axc.set_xlim(0, 2)
+    axc.set_ylim(-0.15, 3.25)
+    axc.set_xlabel("t / ms")
+    axc.set_ylabel("$u_C$ / V")
+    axc.set_title("(b) 响应 $u_C$：充电（零状态）+ 放电（零输入）")
+    axc.legend(loc="center right", fontsize=8)
+
     win = (t >= te - 0.02 * T0) & (t <= te + 6 * d["tau_eff"])
-    ax.plot((t[win] - te) * 1e6, uo[win], color=COL["out"], lw=2.0, label="$u_C$ 上升段")
-    ax.axhline(0.632 * U0, color=COL["alt"], lw=0.9, ls=":")
-    ax.axvline(d["tau_eff"] * 1e6, color=COL["ok"], lw=1.0, ls="--")
-    ax.plot([d["tau_eff"] * 1e6], [0.632 * U0], "o", color=COL["alt"], ms=5)
-    ax.annotate(f"τ = {d['tau_cross'] * 1e6:.2f} µs\n(仿真 0.632 判据)",
-                xy=(d["tau_eff"] * 1e6, 0.632 * U0),
-                xytext=(d["tau_eff"] * 1e6 * 1.35, 1.15),
-                arrowprops=dict(arrowstyle="->", color="0.3"), fontsize=8.5)
-    ax.axvspan(0, 5 * d["tau_eff"] * 1e6, color=COL["band"], alpha=0.18)
-    ax.text(5 * d["tau_eff"] * 1e6 * 0.97, 0.25, "5τ", ha="right", color="0.35", fontsize=9)
+    axz.plot((t[win] - te) * 1e6, uo[win], color=COL["out"], lw=2.0, label="$u_C$ 上升段")
+    axz.axhline(thr_hi, color=COL["alt"], lw=0.9, ls=":")
+    axz.axvline(d["tau_eff"] * 1e6, color=COL["ok"], lw=1.0, ls="--")
+    axz.plot([d["tau_eff"] * 1e6], [thr_hi], "o", color=COL["alt"], ms=5)
+    axz.annotate(f"τ = {d['tau_cross'] * 1e6:.2f} µs\n(0.632 判据)",
+                 xy=(d["tau_eff"] * 1e6, thr_hi),
+                 xytext=(d["tau_eff"] * 1e6 * 1.35, 1.15),
+                 arrowprops=dict(arrowstyle="->", color="0.3"), fontsize=8.5)
+    axz.axvspan(0, 5 * d["tau_eff"] * 1e6, color=COL["band"], alpha=0.18)
+    axz.text(5 * d["tau_eff"] * 1e6 * 0.97, 0.25, "5τ", ha="right", color="0.35", fontsize=9)
+    axz.set_xlabel("t - t_edge / µs")
+    axz.set_ylabel("$u_C$ / V")
+    axz.set_title("(c) 上升沿放大：0.632 判据")
+    axz.set_xlim(-5, max(6 * d["tau_eff"] * 1e6, 150))
+    axz.set_ylim(-0.1, 3.2)
+    axz.legend(loc="lower right")
+    fig.savefig(OUT / "fig2_tau.png", bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_small_R(rows):
+    fig, ax = plt.subplots(figsize=(8.8, 3.8))
+    for r, col in zip(rows, (COL["src"], COL["out"], COL["alt"])):
+        m = (r["t"] >= r["te"] - 0.02 * T0) & (r["t"] <= r["te"] + 6 * r["tau"])
+        ax.plot((r["t"][m] - r["te"]) * 1e6, r["uo"][m], color=col, lw=2,
+                label=f"R={r['R'] / 1e3:.1f} kΩ，τ={r['tau'] * 1e6:.1f} µs")
+        ax.axvline(r["tau"] * 1e6, color=col, lw=1, ls="--")
+        ax.plot([r["tau"] * 1e6], [0.632 * U0], "o", color=col, ms=5)
+    ax.axhline(0.632 * U0, color="0.4", lw=0.8, ls=":")
+    ax.text(4, 0.632 * U0 + 0.08, "0.632$U_s$ = 1.896 V", color="0.35", fontsize=8.5)
+    ax.set_xlim(-5, 400)
+    ax.set_ylim(-0.1, 3.2)
     ax.set_xlabel("t - t_edge / µs")
     ax.set_ylabel("$u_C$ / V")
-    ax.set_title("(b) 上升沿放大：0.632 判据")
-    ax.set_xlim(-5, max(6 * d["tau_eff"] * 1e6, 150))
-    ax.set_ylim(-0.1, 3.2)
+    ax.set_title("少量改变 R：波形形状不变，过阈时间随 τ 成比例移动")
     ax.legend(loc="lower right")
     fig.tight_layout()
-    fig.savefig(OUT / "fig2_tau.png", bbox_inches="tight")
+    fig.savefig(OUT / "fig2b_small_R.png", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -417,20 +477,25 @@ def fig_mc(mc_all, budget):
 
 
 def fig_diff(rows):
-    fig, axs = plt.subplots(3, 1, figsize=(9.2, 7.6), sharex=True)
-    for ax, r in zip(axs, rows):
-        t, us, uo = r["t"], r["us"], r["uo"]
+    fig, axs = plt.subplots(4, 1, figsize=(9.2, 8.8), sharex=True,
+                            gridspec_kw=dict(height_ratios=[0.7, 1, 1, 1]))
+    r0 = rows[0]
+    m0 = (r0["t"] >= r0["te"] - 0.1 * T0) & (r0["t"] <= r0["te"] + 0.95 * T0)
+    axs[0].plot((r0["t"][m0] - r0["te"]) * 1e3, r0["us"][m0],
+                color=COL["alt"], lw=1.5, drawstyle="steps-post")
+    axs[0].set_ylim(-0.4, 3.4)
+    axs[0].set_ylabel("$u_s$ / V")
+    axs[0].set_title("(a) 激励 $u_s$：0/3 V 方波（三组响应共用）")
+    for ax, r, tag in zip(axs[1:], rows, "bcd"):
+        t, uo = r["t"], r["uo"]
         m = (t >= r["te"] - 0.1 * T0) & (t <= r["te"] + 0.95 * T0)
-        tt = (t[m] - r["te"]) * 1e3
-        ax.plot(tt, us[m] - 1.5, color=COL["src"], lw=0.9, ls="--",
-                label="$u_s$（去直流，±1.5 V）")
-        ax.plot(tt, uo[m], color=COL["out"], lw=1.6, label="$u_R$")
+        ax.plot((t[m] - r["te"]) * 1e3, uo[m], color=COL["out"], lw=1.6, label="$u_R$")
         ax.axhline(0, color="0.4", lw=0.6)
-        ax.set_title(f"$R$ = {r['R'] / 1e3:g} kΩ，τ = {r['tau'] * 1e6:.0f} µs，"
+        ax.set_title(f"({tag}) $R$ = {r['R'] / 1e3:g} kΩ，τ = {r['tau'] * 1e6:.0f} µs，"
                      f"τ/(T/2) = {r['ratio']:.2f}，平顶中点残余 = {r['residual_pct']:.1f}%")
-        ax.set_ylabel("V")
+        ax.set_ylabel("$u_R$ / V")
         ax.set_ylim(-3.5, 3.5)
-        ax.legend(loc="upper right", ncol=2)
+        ax.legend(loc="upper right")
     axs[-1].set_xlabel("t - t_edge / ms")
     axs[-1].set_xlim(-0.05, 0.98)
     fig.tight_layout()
@@ -498,6 +563,8 @@ def main():
     print(f"含寄生 τ_eff    = {base['tau_eff'] * 1e6:.3f} µs  (Rs, Cp 已计入)")
     print(f"仿真 0.632 判据 = {base['tau_cross'] * 1e6:.3f} µs  "
           f"(偏差 {(base['tau_cross'] / base['tau_eff'] - 1) * 100:+.2f}%)")
+    print(f"仿真 0.368 判据 = {base['tau_fall'] * 1e6:.3f} µs  "
+          f"(偏差 {(base['tau_fall'] / base['tau_eff'] - 1) * 100:+.2f}%)")
     print(f"单次示波器读数  = {base['tau_scope'] * 1e6:.1f} µs  "
           f"(时基 {timebase_for(base['tau_eff']) * 1e6:.0f} µs/div)")
 
@@ -529,6 +596,12 @@ def main():
         print(f"C={c * 1e12:7.0f} pF  τ={tau_eff(R_NOM, c) * 1e6:8.1f} µs  "
               f"τ/(T/2)={c_rows[-1]['ratio']:5.2f}  半周期末 u_C={end:.3f} V")
 
+    small_rows = small_change()
+    for r in small_rows:
+        print(f"微调 R={r['R'] / 1e3:5.1f} kΩ  τ_eff={r['tau'] * 1e6:7.2f} µs  "
+              f"过阈={r['tau_cross'] * 1e6:7.2f} µs (偏差 {r['dev_pct']:+.2f}%)  "
+              f"单次读数={r['tau_scope'] * 1e6:5.1f} µs")
+
     diff_rows = [diff_metrics(R) for R in (1e3, 10e3, 100e3)]
     for r in diff_rows:
         print(f"微分 R={r['R'] / 1e3:5.0f} kΩ  τ={r['tau'] * 1e6:7.1f} µs  "
@@ -548,6 +621,7 @@ def main():
 
     fig_setup()
     fig_tau(base)
+    fig_small_R(small_rows)
     fig_c_sweep(c_rows)
     fig_diff(diff_rows)
     fig_int(int_rows)
@@ -578,6 +652,7 @@ def main():
                            ok=bool(np.isfinite(err) and err <= tol)))
 
     chk("标称 τ 仿真 vs 解析", abs(base["tau_cross"] / base["tau_eff"] - 1), 5e-3)
+    chk("0.632 vs 0.368 判据", abs(base["tau_fall"] / base["tau_cross"] - 1), 5e-3)
     chk("MC 单次 τ vs 解析（最大）", mc_comp["max_cross_vs_analytic"], 5e-3)
     chk("RSS 合成 vs 合计 MC", abs(sig_rss - sig_all) / sig_all, 0.15)
     chk("积分 ΔU vs tanh 解析（10k）",
@@ -593,6 +668,10 @@ def main():
         abs(diff_rows[1]["peak"] / diff_rows[1]["peak_ideal"] - 1), 1e-2)
     chk("C 增大后半周期末 u_C 单调下降",
         0.0 if c_rows[0]["end_voltage"] > c_rows[1]["end_voltage"] > c_rows[2]["end_voltage"] else 1.0, 0.0)
+    chk("少量改变 R：τ 随 R 单调上升",
+        0.0 if small_rows[0]["tau"] < small_rows[1]["tau"] < small_rows[2]["tau"] else 1.0, 0.0)
+    chk("少量改变 R：过阈 vs 解析（最大）",
+        max(abs(r["tau_cross"] / r["tau"] - 1) for r in small_rows), 5e-3)
 
     res = dict(
         meta=dict(note="所有数值来自 ngspice-36 真实运行；解析式只做对账",
@@ -601,6 +680,8 @@ def main():
         nominal=dict(tau_theory_us=R_NOM * C_NOM * 1e6,
                      tau_eff_us=base["tau_eff"] * 1e6,
                      tau_cross_us=base["tau_cross"] * 1e6,
+                     tau_fall_us=base["tau_fall"] * 1e6,
+                     u_hi_v=base["u_hi"], u_lo_v=base["u_lo"],
                      tau_scope_us=base["tau_scope"] * 1e6,
                      timebase_us=timebase_for(base["tau_eff"]) * 1e6,
                      u0_v=base["u0"]),
@@ -610,6 +691,7 @@ def main():
                 max_cross_vs_analytic=mc_comp["max_cross_vs_analytic"]),
         budget=budget,
         c_sweep=[{k: v for k, v in r.items() if k not in ("t", "us", "uo")} for r in c_rows],
+        small_change=[{k: v for k, v in r.items() if k not in ("t", "us", "uo")} for r in small_rows],
         diff=[{k: v for k, v in r.items() if k not in ("t", "us", "uo")}
               for r in diff_rows + diff_sweep],
         integral=[{k: v for k, v in r.items() if k not in ("t", "us", "uo")}
