@@ -230,7 +230,7 @@ def _dc_op(netlist: str, coll: str, emit: str | None, vcc_src: str) -> tuple[flo
     with tempfile.TemporaryDirectory() as td:
         cir = Path(td) / "op.cir"
         cir.write_text(script)
-        r = subprocess.run(["ngspice", "-b", str(cir)], capture_output=True, text=True, cwd=td)
+        r = subprocess.run(["ngspice", "-b", str(cir)], capture_output=True, encoding="utf-8", errors="replace", cwd=td)
         vals = {}
         for v in vectors:
             f = Path(td) / f"{fname(v)}.dat"

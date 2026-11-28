@@ -62,7 +62,7 @@ def run_ac(netlist: str, start: float, stop: float, ppd: int, vec: str) -> tuple
         cir = Path(td) / "ac.cir"
         cir.write_text(script, encoding="utf-8")
         r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True,
-                           text=True, cwd=td)
+                           encoding="utf-8", errors="replace", cwd=td)
         raw = Path(td) / f"{fname}.dat"
         if not raw.exists():
             raise SystemExit(f"ngspice 没有输出 {fname}.dat\n{r.stdout[-1500:]}\n{r.stderr[-1500:]}")
@@ -308,7 +308,7 @@ def main(argv: list[str]) -> int:
 
 
 def _ngspice_version() -> str:
-    out = subprocess.run([NGSPICE, "-v"], capture_output=True, text=True).stdout
+    out = subprocess.run([NGSPICE, "-v"], capture_output=True, encoding="utf-8", errors="replace").stdout
     m = re.search(r"ngspice-(\d+)", out)
     return m.group(1) if m else "?"
 

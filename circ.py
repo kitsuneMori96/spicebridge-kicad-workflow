@@ -230,7 +230,7 @@ def _run(netlist: str, control: str) -> dict[str, np.ndarray]:
     with tempfile.TemporaryDirectory() as td:
         cir = Path(td) / "c.cir"
         cir.write_text(script, encoding="utf-8")
-        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, text=True, cwd=td)
+        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, encoding="utf-8", errors="replace", cwd=td)
         files = sorted(Path(td).glob("*.dat"))
         if not files:
             raise SystemExit(f"ngspice 无输出：\n{r.stdout[-2000:]}\n{r.stderr[-800:]}")

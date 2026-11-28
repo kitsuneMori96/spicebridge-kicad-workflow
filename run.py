@@ -106,7 +106,7 @@ def render(sch: Path, out: Path, name: str) -> bool:
     """Export SVG + PNG and verify the PNG actually opens. Returns success."""
     r = subprocess.run(
         ["kicad-cli", "sch", "export", "svg", "-o", str(out), str(sch)],
-        text=True, capture_output=True,
+        encoding="utf-8", errors="replace", capture_output=True,
     )
     if r.returncode != 0:
         print(f"  WARNING: kicad-cli svg export failed: {r.stderr.strip()[:300]}", flush=True)
@@ -174,7 +174,7 @@ def main() -> int:
 
     sch = out / f"{name}.kicad_sch"
     print(f"== {name}: schematic ==", flush=True)
-    r = subprocess.run([sys.executable, str(cdir / "layout.py"), str(sch)], text=True)
+    r = subprocess.run([sys.executable, str(cdir / "layout.py"), str(sch)], encoding="utf-8", errors="replace")
     if r.returncode != 0:
         print("layout script failed", flush=True)
         print("RESULT: FAIL")

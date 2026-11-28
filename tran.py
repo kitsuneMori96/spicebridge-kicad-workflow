@@ -108,7 +108,7 @@ def _ngspice_tran(netlist: str, dt: float, total: float) -> dict[str, np.ndarray
     with tempfile.TemporaryDirectory() as td:
         cir = Path(td) / "t.cir"
         cir.write_text(script)
-        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, text=True, cwd=td)
+        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, encoding="utf-8", errors="replace", cwd=td)
         out = {}
         for n in vectors:
             f = Path(td) / f"{n}.dat"
@@ -214,7 +214,7 @@ def _wrdata(netlist: str, vectors: list[str], dt: float, total: float):
     with tempfile.TemporaryDirectory() as td:
         cir = Path(td) / "t.cir"
         cir.write_text(script)
-        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, text=True, cwd=td)
+        r = subprocess.run([NGSPICE, "-b", str(cir)], capture_output=True, encoding="utf-8", errors="replace", cwd=td)
         data = {}
         for v in vectors:
             f = Path(td) / f"{fname(v)}.dat"

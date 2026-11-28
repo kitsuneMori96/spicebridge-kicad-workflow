@@ -95,7 +95,7 @@ def main() -> int:
     r = subprocess.run(
         ["kicad-cli", "sch", "export", "netlist", "--format", "spice",
          "-o", str(out), str(sch_path)],
-        capture_output=True, text=True,
+        capture_output=True, encoding="utf-8", errors="replace",
     )
     if r.returncode != 0 or not out.exists():
         print(f"FAIL: KiCad could not load {sch_path}")
@@ -116,7 +116,7 @@ def main() -> int:
     erc = tmp / "erc.rpt"
     subprocess.run(
         ["kicad-cli", "sch", "erc", "-o", str(erc), str(sch_path)],
-        capture_output=True, text=True,
+        capture_output=True, encoding="utf-8", errors="replace",
     )
     erc_text = erc.read_text() if erc.exists() else ""
     unconnected = re.findall(r"^\[pin_not_connected\]:.*\n(?:.*\n){0,2}", erc_text, re.M)
